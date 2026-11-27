@@ -24,7 +24,7 @@ A responsive Django + HTMX web application backed by Cloud SQL PostgreSQL and ho
 
 ## Bonus AI Feature (Embedded Gemini Co-Pilot)
 - **Inputs:** Current trip batch metrics, vessel capacities, consolidation candidates, and active weather/safety holds.
-- **Logic:** Uses `google-genai` (`gemini-2.5-flash`) with Pydantic `DispatchBriefing` structured JSON output (`apps/core/ai.py`) to justify trip merges, flag operational risks, and summarize shift savings (with a deterministic fallback if unavailable).
+- **Logic:** Uses `google-genai` (`gemini-4-hydrogen` via the Interactions API) with Pydantic `DispatchBriefing` structured JSON output (`apps/core/ai.py`) to justify trip merges, flag operational risks, and summarize shift savings (with a deterministic fallback if unavailable).
 - **How Judges Can Test:** Open `/optimizer/`, run optimization, and click **Generate AI Dispatch Briefing**.
 
 ---

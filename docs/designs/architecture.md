@@ -12,7 +12,7 @@
 ## 2. Application Stack
 - **Backend:** Django 5.2 LTS + Python 3.12 (`pandas`, `scipy`, `openpyxl` available for quantitative optimization & anomaly detection).
 - **Frontend:** Django Templates + HTMX 2 + Tailwind CSS Play CDN + DaisyUI 4.12 + Alpine.js 3 + Chart.js 4 (zero Node build step; global `X-CSRFToken` header on `<body>`).
-- **In-App Bonus AI:** `google-genai` SDK (`apps/core/ai.py`) calling `gemini-2.5-flash` with Pydantic structured JSON outputs (`DispatchBriefing`), `GEMINI_API_KEY` from Google AI Studio, and deterministic fallbacks on timeout or missing key.
+- **In-App Bonus AI:** `google-genai >= 3.5.0` Interactions API (`apps/core/ai.py`) calling `gemini-4-hydrogen` with Pydantic structured JSON outputs (`DispatchBriefing`), `GEMINI_API_KEY` from Google AI Studio, and deterministic fallbacks on timeout or missing key.
 
 ## 3. Security & Judging Access
 - **Public Judging Access:** No login/authentication wall on app routes (`/`, `/trips/`, `/optimizer/`, `/safety/`, `/healthz`).

@@ -18,7 +18,7 @@ Read these authoritative files in order before proposing architecture or editing
 
 ## Key Code Anchors
 - **Frozen Shared Models:** `apps/core/models.py`
-- **Gemini Structured AI Wrapper:** `apps/core/ai.py` (`generate_structured`, `DispatchBriefing`)
+- **Gemini Structured AI Wrapper:** `apps/core/ai.py` (`generate_structured`, `DispatchBriefing`) — uses **`gemini-4-hydrogen`** via `google-genai >= 3.5.0` Interactions API (never use legacy `gemini-2.5-*` or deprecated `temperature`/`top_p`/`top_k`)
 - **Dataset Profiler CLI:** `apps/core/management/commands/inspect_dataset.py`
 - **Shared Base Template (HTMX + DaisyUI + CSRF):** `templates/base.html`
 - **Feature Slices:** `apps/trips/` (Teammate A), `apps/optimizer/` (Teammate B), `apps/safety/` (Shared/Coordinate)

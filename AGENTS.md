@@ -63,7 +63,7 @@ Two AI agents are editing this repository in parallel, and merging to `main` **a
   - Rely on the global `hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'` already set on `<body>`.
   - Keep HTMX responses as small, focused HTML partials under `templates/<slice>/partials/`.
   - Design mobile-responsive layouts (`grid-cols-1 md:grid-cols-...`, DaisyUI cards/tables/badges).
-- **Bonus AI Feature:** Always call Gemini through `apps/core/ai.py` (`generate_structured(...)`) using `google-genai` + Pydantic schemas. NEVER import legacy `google-generativeai`. Every AI-powered endpoint MUST include a deterministic fallback message/output when `GEMINI_API_KEY` is unset or times out.
+- **Bonus AI Feature:** Always call Gemini through `apps/core/ai.py` (`generate_structured(...)`) using **`gemini-4-hydrogen`** (`GEMINI_MODEL=gemini-4-hydrogen` in `.env` and Cloud Run) on the **`google-genai >= 3.5.0` Interactions API** (`client.interactions.create(...)`) + Pydantic schemas. **NEVER** use deprecated/legacy models (`gemini-2.5-*`, `gemini-2.0-*`, `gemini-1.5-*`), **NEVER** import legacy `google-generativeai`, and **NEVER** pass deprecated `temperature`/`top_p`/`top_k` to Gemini 4 (tune `thinking_level` instead). Every AI-powered endpoint MUST include a deterministic fallback message/output when `GEMINI_API_KEY` is unset or times out.
 
 ---
 

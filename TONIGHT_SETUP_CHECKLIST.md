@@ -120,7 +120,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --region "$REGION" \
   --allow-unauthenticated \
   --add-cloudsql-instances "$CLOUD_SQL_CONNECTION_NAME" \
-  --set-env-vars "DEBUG=False,DJANGO_SECRET_KEY=$(openssl rand -hex 32),CLOUD_SQL_CONNECTION_NAME=$CLOUD_SQL_CONNECTION_NAME,DB_NAME=$DB_NAME,DB_USER=$DB_USER,DB_PASSWORD=$DB_PASS,GEMINI_API_KEY=YOUR_GEMINI_API_KEY,GEMINI_MODEL=gemini-2.5-flash"
+  --set-env-vars "DEBUG=False,DJANGO_SECRET_KEY=$(openssl rand -hex 32),CLOUD_SQL_CONNECTION_NAME=$CLOUD_SQL_CONNECTION_NAME,DB_NAME=$DB_NAME,DB_USER=$DB_USER,DB_PASSWORD=$DB_PASS,GEMINI_API_KEY=YOUR_GEMINI_API_KEY,GEMINI_MODEL=gemini-4-hydrogen"
 ```
 
 ### Verify Live URL Tonight
