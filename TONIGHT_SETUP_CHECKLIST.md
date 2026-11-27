@@ -2,6 +2,10 @@
 
 Follow this checklist in order tonight so both laptops, GitHub, Antigravity, and 100% GCP hosting are verified before tomorrow morning.
 
+> **Shortcut for Steps 3 & 4:** Once you have created the team GitHub repo and cloned it on each laptop, you can let Antigravity automate local setup, tests, and GCP provisioning using [SETUP_AGENT.md](SETUP_AGENT.md):
+> - **Laptop A:** `"Follow SETUP_AGENT.md for Laptop A"`
+> - **Laptop B:** `"Follow SETUP_AGENT.md for Laptop B"`
+
 ---
 
 ## 0. URGENT (Before 11:00 PM Tonight) — CODED Portal Registration
