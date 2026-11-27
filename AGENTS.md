@@ -44,7 +44,14 @@ Two AI agents are editing this repository in parallel, and merging to `main` **a
    - Keep PRs small and frequent (every 45–60 minutes).
    - Fill out `.github/pull_request_template.md`.
    - **NEVER auto-merge your own PR into `main`.** Stop after opening the PR and give the human the PR link to review and click Merge.
-7. **Secrets Hygiene:**
+7. **Parallel PRs & Merge Conflict Resolution:**
+   - When both teammates open PRs on separate slices (`apps/trips/` vs `apps/optimizer/`), they merge cleanly back-to-back without conflicts.
+   - If a teammate merges first and GitHub flags a merge conflict on your open PR:
+     1. Run `git fetch origin && git merge origin/main` on your `feat/*` branch.
+     2. Resolve conflicts carefully while **preserving both teammates' changes** (never overwrite the other teammate's slice code or migrations).
+     3. Re-run the Mandatory Pre-Push Gate (`python manage.py check && python manage.py makemigrations --check --dry-run && python manage.py test`).
+     4. Push the updated `feat/*` branch and wait for the human to click Merge.
+8. **Secrets Hygiene:**
    - NEVER commit `.env`, API keys (`GEMINI_API_KEY`), service-account JSONs, `db.sqlite3`, or raw external CSV/XLSX data files unless explicitly approved.
 
 ---

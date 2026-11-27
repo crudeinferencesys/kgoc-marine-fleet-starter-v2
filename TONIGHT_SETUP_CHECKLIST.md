@@ -25,12 +25,16 @@ Follow this checklist in order tonight so both laptops, GitHub, Antigravity, and
 ## 2. GitHub Setup (Avoid the Double-Fork Trap!)
 > **Important:** Do **NOT** both fork the starter repo into two separate forks, or you will split your PRs across two repos.
 
-1. On **Account A's GitHub**, import or fork `Salmanisco/kgoc-marine-fleet-starter` (make it private or public as you prefer — remember your Cloud Build repo connection needs access).
+1. On **Account A's GitHub**, import or fork `Salmanisco/kgoc-marine-fleet-starter` (make it **Public** so GitHub Free enforces branch protection and secret push protection).
 2. On that single team repo (`<AccountA>/kgoc-marine-fleet-starter`), go to **Settings -> Collaborators** and invite **Account B** with **Write** access.
-3. Go to **Settings -> Branches -> Add branch protection rule** for `main`:
-   - Check **Require a pull request before merging** (leave required approvals at `0` so either teammate can merge after a quick 30-second check).
-   - Optionally block force pushes.
-4. **Both laptops** clone the **exact same** team repository:
+3. Confirm visibility is **Public** (**Settings -> General -> Danger Zone -> Change visibility -> Make public**).
+4. Go to **Settings -> Branches -> Add classic branch protection rule** for `main`:
+   - Check **Require a pull request before merging** (`0` required approvals so either teammate can merge after a quick 30-second check).
+   - Leave **Require branches to be up to date before merging** **UNCHECKED** (so parallel slice PRs merge back-to-back cleanly).
+   - Check **Do not allow bypassing the above settings**.
+   - Optionally block force pushes (and leave **Allow force pushes** unchecked).
+5. Go to **Settings -> Code security** and enable **Secret scanning** and **Push protection**.
+6. **Both laptops** clone the **exact same** team repository:
    ```sh
    git clone <TEAM_REPO_URL>
    cd kgoc-marine-fleet-starter
