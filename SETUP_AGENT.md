@@ -108,7 +108,7 @@ Once confirmed, run with the chosen `PROJECT_ID`, `BILLING_ACCOUNT_ID`, and `REG
      --region "$REGION" \
      --allow-unauthenticated \
      --add-cloudsql-instances "$CLOUD_SQL_CONNECTION_NAME" \
-     --set-env-vars "DEBUG=False,DJANGO_SECRET_KEY=$DJANGO_SECRET_KEY,CLOUD_SQL_CONNECTION_NAME=$CLOUD_SQL_CONNECTION_NAME,DB_NAME=kgoc_fleet,DB_USER=kgoc_app,DB_PASSWORD=$DB_PASS,GEMINI_API_KEY=$GEMINI_API_KEY,GEMINI_MODEL=gemini-2.5-flash"
+     --set-env-vars "DEBUG=False,DJANGO_SECRET_KEY=$DJANGO_SECRET_KEY,CLOUD_SQL_CONNECTION_NAME=$CLOUD_SQL_CONNECTION_NAME,DB_NAME=kgoc_fleet,DB_USER=kgoc_app,DB_PASSWORD=$DB_PASS,GEMINI_API_KEY=$GEMINI_API_KEY,GEMINI_MODEL=gemini-4-hydrogen"
    ```
 2. Capture the deployed Cloud Run URL (`SERVICE_URL`) and verify live endpoints via `curl`:
    - `curl -sf "$SERVICE_URL/healthz"` -> MUST show `"status": "ok"`, `"database": "postgresql"`, and `"ai_configured": true`.
