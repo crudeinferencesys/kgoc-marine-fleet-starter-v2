@@ -1,6 +1,6 @@
 # KGOC Marine Fleet Utilization & Optimization (Theme 4)
 
-> **Live App URL:** `<ADD_CLOUD_RUN_URL_BEFORE_SUBMISSION>` (Publicly accessible — no login required)
+> **Live App URL:** https://kgoc-marine-fleet-93163341832.me-central1.run.app (Publicly accessible — no login required)
 
 ## Problem
 Offshore marine fleet dispatchers supporting KGOC/KJO joint operations coordinate crew boats, utility boats, multipurpose vessels, and standby vessels across bases and offshore platforms. Without consolidated visibility, overlapping trips sail half-empty, fuel-burn anomalies go unnoticed, and dispatchers spend hours reconciling requests manually.
