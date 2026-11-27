@@ -12,3 +12,12 @@ staticfiles
 docs
 *.md
 !README.md
+*.csv
+*.xlsx
+*.xls
+*-key.json
+service-account*.json
+credentials*.json
+.agents
+.github
+.pytest_cache

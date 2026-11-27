@@ -70,6 +70,7 @@ def healthz(request: HttpRequest) -> JsonResponse:
             "status": "ok",
             "database": _database_engine_label(),
             "ai_configured": is_ai_configured(),
+            "gemini_model": settings.GEMINI_MODEL,
         },
         status=200,
     )

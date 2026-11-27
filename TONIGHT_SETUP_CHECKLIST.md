@@ -125,8 +125,8 @@ gcloud run deploy "$SERVICE_NAME" \
 
 ### Verify Live URL Tonight
 1. Copy the printed Cloud Run URL (`https://kgoc-marine-fleet-....run.app`).
-2. Visit `https://<URL>/healthz` — confirm it returns:
-   `{"status": "ok", "database": "postgresql", "ai_configured": true}`
+2. Visit `https://<URL>/health/` (Cloud Run reserves `/healthz`) — confirm it returns:
+   `{"status": "ok", "database": "postgresql", "ai_configured": true, "gemini_model": "gemini-4-hydrogen"}`
 3. Visit `https://<URL>/trips/` and click **Test HTMX + CSRF** — confirm green success banner (proves HTTPS proxy headers + CSRF + Cloud Run all work!).
 
 ### Connect GitHub Auto-Deploy (Ideal for Phone Hotspots)
