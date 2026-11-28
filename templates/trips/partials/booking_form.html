@@ -108,8 +108,9 @@
   {% endif %}
 
   <!-- Dedicated 3-Step Simple-Menu Guided Workflow -->
+  <div x-show="!showConfirmation" x-cloak>
   <form
-    x-show="!showConfirmation"
+    id="trips-booking-form"
     method="post"
     action="{% url 'trips:create' %}"
     hx-post="{% url 'trips:create' %}"
@@ -130,6 +131,9 @@
       priority: 'Routine',
       flexibleWindow: true,
       manualVesselOverride: false,
+      getForm() {
+        return this.$root || document.getElementById('trips-booking-form');
+      },
       init() {
         try {
           const el = document.getElementById('vessels-meta-data');
@@ -140,15 +144,17 @@
         this.syncFromDom();
       },
       syncFromDom() {
-        const vEl = this.$el.querySelector('[name=vessel]');
-        const dEl = this.$el.querySelector('[name=destination]');
-        const mEl = this.$el.querySelector('[name=mission_type]');
-        const pEl = this.$el.querySelector('[name=passengers]');
-        const cEl = this.$el.querySelector('[name=cargo_tonnes]');
-        const tEl = this.$el.querySelector('[name=departure_time]');
-        const wEl = this.$el.querySelector('[name=weather]');
-        const prEl = this.$el.querySelector('[name=priority]');
-        const fEl = this.$el.querySelector('[name=flexible_window]');
+        const form = this.getForm();
+        if (!form) return;
+        const vEl = form.querySelector('[name=vessel]');
+        const dEl = form.querySelector('[name=destination]');
+        const mEl = form.querySelector('[name=mission_type]');
+        const pEl = form.querySelector('[name=passengers]');
+        const cEl = form.querySelector('[name=cargo_tonnes]');
+        const tEl = form.querySelector('[name=departure_time]');
+        const wEl = form.querySelector('[name=weather]');
+        const prEl = form.querySelector('[name=priority]');
+        const fEl = form.querySelector('[name=flexible_window]');
         this.vesselId = vEl ? String(vEl.value || '') : '';
         this.destination = dEl ? String(dEl.value || '') : '';
         this.missionType = mEl ? String(mEl.value || '') : '';
@@ -160,14 +166,18 @@
         this.flexibleWindow = fEl ? Boolean(fEl.checked) : true;
       },
       pickDestination(val) {
-        const dEl = this.$el.querySelector('[name=destination]');
+        const form = this.getForm();
+        if (!form) return;
+        const dEl = form.querySelector('[name=destination]');
         if (dEl) {
           dEl.value = val;
           this.destination = val;
         }
       },
       pickMission(val) {
-        const mEl = this.$el.querySelector('[name=mission_type]');
+        const form = this.getForm();
+        if (!form) return;
+        const mEl = form.querySelector('[name=mission_type]');
         if (mEl) {
           mEl.value = val;
           this.missionType = val;
@@ -184,7 +194,7 @@
             match = entries.find(([, v]) => !v.is_standby_designated && v.vessel_type === 'Crew Boat');
           }
           if (match) {
-            const vEl = this.$el.querySelector('[name=vessel]');
+            const vEl = form.querySelector('[name=vessel]');
             if (vEl) {
               vEl.value = match[0];
               this.vesselId = match[0];
@@ -193,8 +203,10 @@
         }
       },
       pickVessel(pk) {
+        const form = this.getForm();
+        if (!form) return;
         const key = String(pk);
-        const vEl = this.$el.querySelector('[name=vessel]');
+        const vEl = form.querySelector('[name=vessel]');
         if (vEl) {
           vEl.value = key;
           this.vesselId = key;
@@ -202,62 +214,95 @@
         }
       },
       setPax(val) {
-        const pEl = this.$el.querySelector('[name=passengers]');
+        const form = this.getForm();
+        if (!form) return;
+        const pEl = form.querySelector('[name=passengers]');
         if (pEl) {
           pEl.value = val;
           this.passengers = val;
         }
       },
       setCargo(val) {
-        const cEl = this.$el.querySelector('[name=cargo_tonnes]');
+        const form = this.getForm();
+        if (!form) return;
+        const cEl = form.querySelector('[name=cargo_tonnes]');
         if (cEl) {
           cEl.value = val;
           this.cargoTonnes = val;
         }
       },
       setDepartureTime(val) {
-        const tEl = this.$el.querySelector('[name=departure_time]');
+        const form = this.getForm();
+        if (!form) return;
+        const tEl = form.querySelector('[name=departure_time]');
         if (tEl) {
           tEl.value = val;
           this.departureTime = val;
         }
       },
       pickWeather(val) {
-        const wEl = this.$el.querySelector('[name=weather]');
+        const form = this.getForm();
+        if (!form) return;
+        const wEl = form.querySelector('[name=weather]');
         if (wEl) {
           wEl.value = val;
           this.weather = val;
         }
       },
       pickPriority(val) {
-        const prEl = this.$el.querySelector('[name=priority]');
+        const form = this.getForm();
+        if (!form) return;
+        const prEl = form.querySelector('[name=priority]');
         if (prEl) {
           prEl.value = val;
           this.priority = val;
         }
       },
       nextStep() {
+        if (this.step === 2) {
+          const form = this.getForm();
+          const pEl = form ? form.querySelector('[name=passengers]') : null;
+          const cEl = form ? form.querySelector('[name=cargo_tonnes]') : null;
+          if ((pEl && !pEl.reportValidity()) || (cEl && !cEl.reportValidity()) || this.isOverloaded) {
+            return;
+          }
+        }
         if (this.step < 3) this.step += 1;
       },
       prevStep() {
         if (this.step > 1) this.step -= 1;
       },
       skipOptionalAndSubmit() {
-        const tEl = this.$el.querySelector('[name=departure_time]');
-        const wEl = this.$el.querySelector('[name=weather]');
-        const prEl = this.$el.querySelector('[name=priority]');
-        const fEl = this.$el.querySelector('[name=flexible_window]');
-        const nEl = this.$el.querySelector('[name=notes]');
+        const form = this.getForm();
+        if (!form) return;
+        if (this.isOverloaded) {
+          this.step = 2;
+          return;
+        }
+        const pEl = form.querySelector('[name=passengers]');
+        const cEl = form.querySelector('[name=cargo_tonnes]');
+        if ((pEl && !pEl.checkValidity()) || (cEl && !cEl.checkValidity())) {
+          this.step = 2;
+          this.$nextTick(() => form.reportValidity());
+          return;
+        }
+        const tEl = form.querySelector('[name=departure_time]');
+        const wEl = form.querySelector('[name=weather]');
+        const prEl = form.querySelector('[name=priority]');
+        const fEl = form.querySelector('[name=flexible_window]');
+        const nEl = form.querySelector('[name=notes]');
         if (tEl) tEl.value = '08:30';
         if (wEl) wEl.value = 'Calm';
         if (prEl) prEl.value = 'Routine';
         if (fEl) fEl.checked = true;
         if (nEl) nEl.value = '';
         this.syncFromDom();
-        if (typeof this.$el.requestSubmit === 'function') {
-          this.$el.requestSubmit();
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit();
+        } else if (window.htmx) {
+          window.htmx.trigger(form, 'submit');
         } else {
-          this.$el.submit();
+          form.submit();
         }
       },
       get selectedVessel() {
@@ -306,7 +351,6 @@
         return this.selectedVessel.active_overrides;
       }
     }"
-    x-init="init()"
     @input="syncFromDom()"
     @change="syncFromDom()">
     {% csrf_token %}
@@ -712,4 +756,5 @@
       </div>
     </div>
   </form>
+  </div>
 </div>
