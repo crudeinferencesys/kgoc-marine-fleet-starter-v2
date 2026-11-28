@@ -364,7 +364,12 @@ class SafetyViewIntegrationTests(TestCase):
         self.assertContains(response, "safety-anomaly-panel")
         self.assertContains(response, "safety-holds-panel")
         self.assertContains(response, "safety-hold-panel")
-        self.assertContains(response, "safety-inspector-drawer")
+        self.assertContains(response, 'id="safety-inspector-modal"')
+        self.assertContains(response, 'style="display: none;"')
+        self.assertContains(
+            response,
+            ':class="{ \'flex\': inspectorOpen, \'hidden\': !inspectorOpen }"',
+        )
 
     def test_anomalies_partial_filtering_and_pagination(self):
         page_15 = self.client.get(reverse("safety:anomalies"), data={"per_page": "15"})
