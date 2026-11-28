@@ -1,38 +1,41 @@
-# KGOC Marine Fleet Utilization & Optimization (Theme 4)
+# KGOC Marine Fleet Utilization & Optimization (Theme 4 — CrudeInference)
 
-> **Live App URL:** https://kgoc-marine-fleet-93163341832.me-central1.run.app (Publicly accessible — no login required)
+> **Live App URL:** https://crudeinference.com (redirects to Cloud Run `me-central1`: https://kgoc-marine-fleet-93163341832.me-central1.run.app) — Publicly accessible with no login required.
 
 ## Problem
-Offshore marine fleet dispatchers supporting KGOC/KJO joint operations coordinate crew boats, utility boats, multipurpose vessels, and standby vessels across bases and offshore platforms. Without consolidated visibility, overlapping trips sail half-empty, fuel-burn anomalies go unnoticed, and dispatchers spend hours reconciling requests manually.
+Offshore marine fleet dispatchers supporting KGOC/KJO joint operations coordinate crew boats (`CB-01`–`CB-04`, `CB-07`), utility boats (`CB-05`, `CB-06`), and multi-purpose vessels (`CB-08`) between `Marine Base` and offshore platforms/terminals. In the 90-day operational dataset (`976` completed trips):
+- **63.1%** (`616` sailings) depart below 50% max capacity (**43.2%** avg load, **35.8%** avg passenger utilization).
+- **572.6 hours** (**13,440 L** diesel) are lost to avoidable non-productive idling vs. **374.5 hours** of productive onsite work.
+- **39 trips** show high fuel-burn outliers (`>= 1.30×` expected physics consumption, up to `2.07×`), **8** show low readings (`<= 0.70×`), and **15** have missing fuel logs.
 
 ## Target User
-Marine Fleet Dispatchers and Offshore Operations Supervisors planning daily vessel runs under passenger, cargo, and sea-state safety constraints.
+KGOC / KJO Marine Fleet Dispatchers and Offshore Operations Supervisors managing daily vessel assignments, utilization, fuel audits, and sea-state/standby HSE constraints.
 
 ## Solution
-A responsive Django + HTMX web application backed by Cloud SQL PostgreSQL and hosted on Google Cloud Run that:
-1. Tracks fleet utilization and logs new trip requests to PostgreSQL.
-2. Runs a Python consolidation optimizer to eliminate under-utilized sailings while respecting capacity and safety rules.
-3. Flags fuel-burn outliers and enforces live weather/standby constraints.
-4. Embeds a Gemini AI Dispatch Co-Pilot (`google-genai` structured output) to explain trade-offs and draft shift handover briefings.
+A zero-scroll Django 5.2 LTS + HTMX 2 + Alpine.js 3 + Chart.js 4 web application backed by Cloud SQL PostgreSQL on Google Cloud Run (`me-central1`):
+1. **Control Tower (`/`):** Single-screen cockpit with 4 clickable drill-down KPIs (live approved-plan savings + 90-day benchmark opportunity) and a 2×2 clickable Chart.js grid.
+2. **Feature 1 — Trips & Utilization (`/trips/`):** 2-tab operational workspace (`Trip Ledger` + 3-step `Log New Trip` booking form) with live capacity overload guardrails, `Consolidated` status tracking, categorized filter modal, centered telemetry inspector modal, and CSV export.
+3. **Feature 2 — Dispatch Optimizer (`/optimizer/`):** Gulf OSV consolidation engine combining overlapping flexible runs (`0.08` detour penalty), lowest-cost eligible vessel right-sizing, optional multi-stop `Milk-Run` (`Platform A ↔ B ↔ C`, `0.18` detour penalty), hard `SafetyOverride` / `HSE Strict Weather` enforcement, atomic `Approve & Save Plan`, and 1-click `Revert Plan`.
+4. **Feature 3 — Safety & Fuel Guard (`/safety/`, Active):** Physics-based fuel anomaly investigation flags (framed strictly as engineering investigations), vessel readiness from all **720 seeded `VesselAvailability` rows**, and live `SafetyOverride` holds obeyed across `/optimizer/`.
+5. **Feature 4 (Standalone Bonus AI) — AI Dispatch Co-Pilot (`/copilot/`, Next Sprint):** Gemini 4 (`gemini-4-hydrogen` via the `google-genai` Interactions API) structured merge risk review and shift handover brief (`ActionableDispatchBriefing`) with deterministic fallback.
 
 ---
 
-## The 3 Core Features
-1. **Trips & Utilization (`apps/trips/`):** *(Fill exact judge test steps after final merge)*
-2. **Dispatch Optimizer (`apps/optimizer/`):** *(Fill exact judge test steps after final merge)*
-3. **Safety & Fuel Guard (`apps/safety/`):** *(Fill exact judge test steps after final merge)*
-
-## Bonus AI Feature (Embedded Gemini Co-Pilot)
-- **Inputs:** Current trip batch metrics, vessel capacities, consolidation candidates, and active weather/safety holds.
-- **Logic:** Uses `google-genai` (`gemini-4-hydrogen` via the Interactions API) with Pydantic `DispatchBriefing` structured JSON output (`apps/core/ai.py`) to justify trip merges, flag operational risks, and summarize shift savings (with a deterministic fallback if unavailable).
-- **How Judges Can Test:** Open `/optimizer/`, run optimization, and click **Generate AI Dispatch Briefing**.
+## Judge Test Steps (Quick Verification)
+1. **Control Tower (`/`):** Verify zero-scroll KPI cards (`43.2%` utilization, `616` half-empty sailings, `29,640 KWD` est. 90-day opportunity, `1` active hold / `CB-07 Standby Lock`) and click any KPI or chart to drill into its feature.
+2. **Feature 1 (`/trips/`):** Filter via `Half-Empty` / `Fuel Outliers` chips, click any Trip ID (e.g. `TR-00012` or `TR-QUEUE-01`) to open the centered Telemetry Inspector modal (`KWD` audit & siblings), then switch to **`Log New Trip`** to submit a new `pending` request persisted in PostgreSQL (and test overload rejection on `CB-03` with `> 0.5 t` cargo).
+3. **Feature 2 (`/optimizer/`):** Inspect the 3 clean pending consolidations (`TR-QUEUE-01..06`) while `CB-07` (`TR-QUEUE-09`) and rough-weather `Platform C` (`TR-QUEUE-07/08`) remain safely held. Toggle **`HSE Strict Weather`** off to preview rough-weather merges with an amber advisory, toggle **`Milk-Run`** on for multi-platform candidates, then click **`Approve & Save Plan`** → check `/` KPI 3 (`live plan` pill) and `/trips/?status=consolidated` (`Consolidated → TR-...`) → click **`Revert Plan`** under `Saved Plans & Backtest` to restore cleanly.
 
 ---
 
-## Data Used (Mock / Synthetic Disclaimer)
-All data in this application is **mock/synthetic operational data** (derived from the hackathon's optional 8-vessel / 976-trip 90-day mock dataset and/or synthetic test fixtures) used strictly for demonstration. It does **not** represent live or proprietary KGOC operational records.
-
-*(Document exact fuel price in KWD/L, charter cost assumptions, and any synthetic columns here before 17:00.)*
+## Data & Mock Benchmark Assumptions (`apps/core/constants.py`)
+All data in this application is **mock/synthetic operational data** (derived from `KJO_Marine_Fleet_Hackathon_Participant_Dataset.xlsx`: `8` vessels, `976` historical trips over `2026-08-26` → `2026-11-23`, `720` `VesselAvailability` rows, plus `12` synthetic `TR-QUEUE-*` shift requests and `1` active `standby_lock` on `CB-07`). Assumed mock pricing & operational parameters used for unvalidated Pillar 4 estimates:
+- `ASSUMED_DIESEL_KWD_PER_LITER = 0.150` KWD/L
+- `ASSUMED_KG_CO2_PER_LITER = 2.68` kg CO₂/L
+- `CONSOLIDATION_DETOUR_FUEL_PENALTY_FACTOR = 0.08` (same-corridor), `MILK_RUN_DETOUR_FUEL_PENALTY_FACTOR = 0.18` (cross-platform loop)
+- `DISPATCHER_MINUTES_SAVED_PER_MERGE = 15` minutes
+- `VESSEL_HOURLY_OPERATING_KWD`: Crew Boat `42.0` KWD/h, Utility Boat `55.0` KWD/h, Multi-purpose Boat `62.0` KWD/h
+- High fuel outliers (`>= 1.30×` physics expected burn) are flagged for engineering review only (no misconduct claims); blank `Actual_Fuel_L` rows are reported as missing logs rather than zero.
 
 ---
 
@@ -43,6 +46,7 @@ source .venv/bin/activate
 uv pip install -r requirements.txt
 cp .env.example .env
 python manage.py migrate
+python manage.py seed_fleet --if-empty
 python manage.py runserver
 ```
 
@@ -57,5 +61,5 @@ python manage.py check && python manage.py makemigrations --check --dry-run && p
 ```
 
 ## Limitations
-- Designed as a 1-day hackathon MVP using mock/synthetic fleet data and assumed KWD fuel/charter rates.
-- Optimization uses single-day heuristic/MILP grouping rather than real-time AIS/metocean telemetry integration.
+- Designed as a hackathon MVP using mock/synthetic fleet data and assumed KWD fuel/charter rates — never use synthetic capacity or weather values for live offshore dispatch decisions.
+- Optimization uses single-day heuristic window/capacity pairing rather than live AIS tracking or MetOcean telemetry feeds.

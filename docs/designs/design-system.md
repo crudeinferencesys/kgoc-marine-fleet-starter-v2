@@ -231,7 +231,7 @@ const CHART_PALETTE = {
 ```
 
 ### 2. Dedicated Simple-Menu User-Input Workflow (Centered Tab — Not a Sidebar)
-Whenever a workflow requires user data creation (e.g., logging a new trip on `/trips/`, configuring solver/hold inputs on `/optimizer/` or `/safety/`, or submitting directives on `/copilot/`), **never place the form inside a slide-over sidebar or cramped side column** (reserve slide-over drawers strictly for read-only inspection such as the Trip Telemetry Inspector):
+Whenever a workflow requires user data creation (e.g., logging a new trip on `/trips/`, configuring solver/hold inputs on `/optimizer/` or `/safety/`, or submitting directives on `/copilot/`), **never place the form inside a slide-over sidebar or cramped side column** (reserve overlays strictly for read-only inspection such as the centered **Trip Telemetry Inspector** modal):
 - **Dedicated Centered Workflow Tab:** Switch cleanly into a focused `max-w-4xl mx-auto` workspace tab (`Log New Trip` / `?book=1` with `← Back to Ledger`), hiding Band-2 KPI cards while keeping KPI & table containers mounted in the DOM so HTMX `hx-swap-oob="outerHTML"` refreshes them silently in the background.
 - **Simple-Menu Guided Steps:** Split inputs into calm, un-overwhelming steps (e.g., `1. Route & Mission` → `2. Vessel & Payload` → `3. Optional Details`) using tappable menu cards/pills over raw `<select>` dropdowns whenever options are bounded.
 - **Progress, Smart Defaults & Skip Options:** Render a Deep Maritime Navy (`#0A1628`) step progress bar + explicit remaining-inputs label (`Step 1 of 3 · 1 core step + 1 optional step left`), clickable step pills + live selection summary pill, pre-applied smart defaults (`08:30 · Calm · Routine · Flexible Window`), and a 1-click **Skip optional & submit with defaults** exit hatch available from every step, followed by a focused post-submit confirmation screen (`Log Another`, `View in Ledger`, `Inspect`, next-slice CTA).
@@ -253,7 +253,7 @@ Whenever a workflow requires user data creation (e.g., logging a new trip on `/t
 Keep the default table control bar to **1 simple direct line** without exposing a wall of dropdowns:
 - **1-Line Control Bar:** Live search input (`q`) + 3–4 quick preset chips with live counts (`All`, `Pending`, `Half-Empty`, `Fuel Outliers`) + **`More Filters`** button + **`Export CSV`** link.
 - **Categorized `More Filters` Full-Screen Overlay Modal:** Group power-user filters into logical domain categories (e.g., `Route & Area`, `Fleet & Crew`, `Sea State & Fuel Audit`) navigated via `←` / `→` arrow buttons, keyboard arrow keys, and category tabs with active filter counts, plus removable active-filter chips above the table. When nested inside an HTMX `outerHTML`-swapped table panel, always render the closed modal with `style="display: none;"`, `hidden`, `x-cloak`, and `:class="{ 'flex': moreOpen, 'hidden': !moreOpen }"`.
-- **Default Pagination & Filtered CSV Export:** Paginate dense ledgers (`8` rows default, `8 / 15 / 25` switcher) so the workspace stays zero-scroll on desktop, paired with a filtered **`Export CSV`** download (with formula-injection escaping) and a right slide-over **Inspector** (`TR-00012`) for row deep dives:
+- **Default Pagination, Filtered CSV Export & Centered Inspector Modal:** Paginate dense ledgers (`8` rows default, `8 / 15 / 25` switcher) so the workspace stays zero-scroll on desktop, paired with a filtered **`Export CSV`** download (with formula-injection escaping) and a centered **Trip Telemetry Inspector** command modal (`#trip-inspector-modal`, `max-w-2xl`, `max-h-[88vh]`, settle-safe `style="display: none;"` + `:class` hidden shell) for row deep dives:
 ```html
 <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-100">
   <div class="flex flex-wrap items-center gap-1.5">
@@ -278,7 +278,7 @@ Keep the default table control bar to **1 simple direct line** without exposing 
 
 ## 7. Anti-Patterns Checklist (Do Not Ship)
 - Do **not** let desktop pages (`>= 1280×760`) overflow vertically into full-page scrolling — keep Control Tower (`/`) and core workspaces zero-scroll above the fold (use tabs, 2×2 grids, compact spacing, and bounded table scroll if needed).
-- Do **not** place user data-creation forms inside slide-over sidebars or cramped side columns — use a dedicated centered simple-menu workflow tab (reserve slide-over drawers for read-only inspection).
+- Do **not** place user data-creation forms inside slide-over sidebars or cramped side columns — use a dedicated centered simple-menu workflow tab (reserve modal overlays strictly for read-only inspection).
 - Do **not** add an offshore tactical map or unrequested extra visualizations outside the agreed scope.
 - Do **not** render developer/infrastructure metadata (`DB: sqlite3`, `gemini-4-hydrogen` model pills, `/health/` buttons) inside the global navbar or executive page bodies.
 - Do **not** add duplicate cross-page navigation buttons (`Open Optimizer`, `HSE Holds`, `Dispatch Optimizer`) inside headers when all 5 routes already live in `#primary-top-nav`.

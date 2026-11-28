@@ -1,30 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}Dispatch Optimizer · KGOC Marine Fleet{% endblock %}
+{% block title %}Dispatch Optimizer · CrudeInference · KGOC Marine Fleet{% endblock %}
+
+{% block topbar_title %}Dispatch Optimizer{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'core:copilot:index' %}" class="btn btn-xs bg-indigo-600 hover:bg-indigo-500 text-white border-0 gap-1 font-semibold">
+  AI Co-Pilot
+  <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+  </svg>
+</a>
+{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-    <div>
-      <span class="badge badge-secondary badge-sm mb-1">Feature 2 + Bonus AI · Owner: Teammate B</span>
-      <h1 class="text-2xl font-bold">Dispatch Optimizer &amp; AI Co-Pilot</h1>
-      <p class="text-sm text-base-content/75">
-        Slice folder: <code>apps/optimizer/</code> · Python consolidation solver, KWD/fuel savings calculator, and Gemini structured dispatch briefings.
-      </p>
-    </div>
-    <button
-      class="btn btn-outline btn-sm"
-      hx-post="{% url 'optimizer:ping' %}"
-      hx-target="#optimizer-htmx-status"
-      hx-swap="innerHTML">
-      Test HTMX + CSRF
-    </button>
-  </div>
-
-  <div id="optimizer-htmx-status">
-    <div class="alert bg-base-100 border border-base-300 shadow-sm text-sm">
-      <span>Ready for Feature 2 solver + <code>apps/core/ai.py</code> integration tomorrow at 11:00 AM.</span>
-    </div>
-  </div>
-</div>
+{% include "optimizer/partials/workspace.html" %}
 {% endblock %}

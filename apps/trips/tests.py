@@ -4,7 +4,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from apps.core.models import Trip, Vessel
+from apps.core.models import DispatchPlan, Trip, Vessel
 from apps.trips.forms import TripBookingForm
 from apps.trips.services import (
     filter_trips,
@@ -288,7 +288,7 @@ class TripsViewIntegrationTests(TestCase):
         self.assertTrue(all(t.weather == "Rough" for t in rough_result["page_obj"]))
 
     def test_trip_inspector_returns_telemetry_siblings_and_404(self):
-        # CB-07 pending trip should show standby lock HSE override and physics telemetry
+        # CB-07 pending trip should show standby lock HSE override, physics telemetry, and KWD idle cost
         cb07_trip = Trip.objects.filter(vessel__vessel_id="CB-07", status="pending").first()
         self.assertIsNotNone(cb07_trip)
 
@@ -300,6 +300,57 @@ class TripsViewIntegrationTests(TestCase):
         self.assertContains(response, "Physics-Based Fuel Audit")
         self.assertContains(response, "Standby Vessel Protection Lock")
         self.assertContains(response, "Same-Day Corridor Siblings")
+        self.assertContains(response, "KWD")
+        self.assertContains(response, "trip-inspector:close")
+
+        # High fuel outlier trip should surface spike summary, excess KWD, and Safety & Fuel Guard CTA
+        outlier_trip = next(
+            (
+                t
+                for t in Trip.objects.select_related("vessel").filter(actual_fuel_l__isnull=False)
+                if t.fuel_anomaly_status == "high"
+            ),
+            None,
+        )
+        self.assertIsNotNone(outlier_trip)
+        outlier_res = self.client.get(
+            reverse("trips:inspect", kwargs={"trip_id": outlier_trip.trip_id})
+        )
+        self.assertEqual(outlier_res.status_code, 200)
+        self.assertContains(outlier_res, "Fuel spike:")
+        self.assertContains(outlier_res, "KWD")
+        self.assertContains(outlier_res, "Safety &amp; Fuel Guard")
+
+        # Consolidated trip should render Dispatch Consolidation banner with carrier link + Optimizer link
+        plan = DispatchPlan.objects.create(
+            name="Inspector Modal Merge Plan",
+            scope="pending",
+            baseline_trips=2,
+            optimized_trips=1,
+            trips_eliminated=1,
+            fuel_liters_saved=180.0,
+            kwd_saved=96.0,
+            co2_kg_saved=482.4,
+            is_approved=True,
+        )
+        carrier = Trip.objects.get(trip_id="TR-QUEUE-01")
+        absorbed = Trip.objects.get(trip_id="TR-QUEUE-02")
+        absorbed.status = "consolidated"
+        absorbed.dispatch_plan = plan
+        absorbed.consolidated_into = carrier
+        absorbed.save(update_fields=["status", "dispatch_plan", "consolidated_into"])
+
+        consolidated_res = self.client.get(
+            reverse("trips:inspect", kwargs={"trip_id": absorbed.trip_id})
+        )
+        self.assertEqual(consolidated_res.status_code, 200)
+        self.assertContains(consolidated_res, "Dispatch Consolidation")
+        self.assertContains(consolidated_res, "Inspector Modal Merge Plan")
+        self.assertContains(
+            consolidated_res,
+            reverse("trips:inspect", kwargs={"trip_id": carrier.trip_id}),
+        )
+        self.assertContains(consolidated_res, reverse("optimizer:index"))
 
         missing_response = self.client.get(
             reverse("trips:inspect", kwargs={"trip_id": "TR-DOES-NOT-EXIST"})
@@ -310,6 +361,7 @@ class TripsViewIntegrationTests(TestCase):
         response = self.client.get(reverse("trips:index"))
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'id="booking-drawer"')
+        self.assertNotContains(response, 'id="trip-inspector-drawer"')
         self.assertContains(response, 'id="trip-booking-workflow"')
         self.assertContains(response, "Log New Trip")
         self.assertContains(response, "Route &amp; Mission")
@@ -321,7 +373,7 @@ class TripsViewIntegrationTests(TestCase):
         self.assertContains(response, "Fuel Outliers")
         self.assertContains(response, "Missing Logs")
         self.assertContains(response, "Rough Weather")
-        self.assertContains(response, 'id="trip-inspector-drawer"')
+        self.assertContains(response, 'id="trip-inspector-modal"')
         self.assertContains(response, "More Filters")
         self.assertContains(response, 'id="trips-more-filters-modal"')
         self.assertContains(response, "Route &amp; Area")
@@ -422,6 +474,64 @@ class TripsViewIntegrationTests(TestCase):
             self.assertContains(res, ":class=\"{ 'flex': moreOpen, 'hidden': !moreOpen }\"")
             self.assertContains(res, 'class="hidden fixed inset-0')
             self.assertNotContains(res, 'class="fixed inset-0 z-50 flex')
+
+    def test_consolidated_preset_ordering_badge_and_inspector_banner(self):
+        # Preset chip is hidden when there are 0 consolidated trips
+        initial_res = self.client.get(reverse("trips:ledger"))
+        self.assertEqual(initial_res.status_code, 200)
+        self.assertNotContains(initial_res, "?status=consolidated")
+
+        plan = DispatchPlan.objects.create(
+            name="Shift Alpha Merge Plan",
+            scope="pending",
+            baseline_trips=2,
+            optimized_trips=1,
+            trips_eliminated=1,
+            fuel_liters_saved=210.0,
+            kwd_saved=125.5,
+            co2_kg_saved=562.8,
+            is_approved=True,
+        )
+        carrier = Trip.objects.get(trip_id="TR-QUEUE-01")
+        absorbed = Trip.objects.get(trip_id="TR-QUEUE-02")
+        carrier.dispatch_plan = plan
+        carrier.save(update_fields=["dispatch_plan"])
+        absorbed.status = "consolidated"
+        absorbed.dispatch_plan = plan
+        absorbed.consolidated_into = carrier
+        absorbed.save(update_fields=["status", "dispatch_plan", "consolidated_into"])
+
+        # Service counts, filter, and pending -> consolidated -> completed ordering
+        with self.assertNumQueries(2):
+            all_res = filter_trips({"per_page": "15"})
+        self.assertEqual(all_res["status_counts"]["consolidated"], 1)
+        self.assertEqual(all_res["preset_counts"]["consolidated"], 1)
+        statuses = [t.status for t in list(all_res["page_obj"])[:13]]
+        self.assertEqual(statuses[:11], ["pending"] * 11)
+        self.assertEqual(statuses[11], "consolidated")
+        self.assertEqual(statuses[12], "completed")
+
+        # Ledger renders Consolidated quick preset chip and -> carrier badge
+        filtered_res = self.client.get(
+            reverse("trips:ledger"), data={"status": "consolidated"}
+        )
+        self.assertEqual(filtered_res.status_code, 200)
+        self.assertContains(filtered_res, "?status=consolidated")
+        self.assertContains(filtered_res, absorbed.trip_id)
+        self.assertContains(filtered_res, f"→ {carrier.trip_id}")
+
+        # Inspector renders Dispatch Consolidation banner with clickable HTMX inspect + Optimizer link
+        inspect_res = self.client.get(
+            reverse("trips:inspect", kwargs={"trip_id": absorbed.trip_id})
+        )
+        self.assertEqual(inspect_res.status_code, 200)
+        self.assertContains(inspect_res, "Dispatch Consolidation")
+        self.assertContains(inspect_res, "Shift Alpha Merge Plan")
+        self.assertContains(
+            inspect_res,
+            reverse("trips:inspect", kwargs={"trip_id": carrier.trip_id}),
+        )
+        self.assertContains(inspect_res, reverse("optimizer:index"))
 
     def test_booking_workflow_uses_root_form_lookup_without_alpine_el(self):
         import re
