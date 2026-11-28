@@ -480,3 +480,80 @@ class TripsViewIntegrationTests(TestCase):
             reverse("trips:inspect", kwargs={"trip_id": carrier.trip_id}),
         )
         self.assertContains(inspect_res, reverse("optimizer:index"))
+
+    def test_booking_workflow_uses_root_form_lookup_without_alpine_el(self):
+        import re
+
+        response = self.client.get(reverse("trips:index"), data={"book": "1"})
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode("utf-8")
+        self.assertContains(response, 'id="trips-booking-form"')
+        self.assertContains(response, "getForm()")
+        self.assertContains(response, "this.$root")
+        self.assertNotContains(response, "this.$el")
+        self.assertNotContains(response, 'x-init="init()"')
+
+        # #trips-booking-form is wrapped in <div x-show="!showConfirmation"> so
+        # HTMX settle cannot strip display:none when rendering confirmation.
+        form_tag = re.search(r"<form[^>]*\bid=\"trips-booking-form\"[^>]*>", html)
+        self.assertIsNotNone(form_tag, "Missing #trips-booking-form")
+        self.assertNotIn("x-show=", form_tag.group(0))
+
+        # #optional-trip-details carries settle-safe display:none + :class hidden guard.
+        self.assertContains(response, 'id="optional-trip-details"')
+        self.assertContains(response, ":class=\"{ 'hidden': step !== 3 }\"")
+        self.assertContains(response, 'style="display: none;"')
+
+    def test_create_trip_with_default_and_non_default_step_selections(self):
+        # 1. Default values (mirrors Skip optional & submit with defaults)
+        default_resp = self.client.post(
+            reverse("trips:create"),
+            data={
+                "vessel": self.cb01.pk,
+                "destination": "Platform A",
+                "mission_type": "Passenger Transfer",
+                "departure_time": "08:30",
+                "passengers": 5,
+                "cargo_tonnes": 0.1,
+                "weather": "Calm",
+                "priority": "Routine",
+                "flexible_window": "on",
+                "notes": "",
+            },
+        )
+        self.assertEqual(default_resp.status_code, 200)
+        default_trip = Trip.objects.get(trip_id="TR-LIVE-001")
+        self.assertEqual(default_trip.destination, "Platform A")
+        self.assertEqual(default_trip.mission_type, "Passenger Transfer")
+        self.assertEqual(default_trip.weather, "Calm")
+        self.assertEqual(default_trip.priority, "Routine")
+        self.assertContains(default_resp, "Shift Request Queued")
+
+        # 2. Non-default step selections (Platform C, Material Delivery, CB-05, Moderate, Urgent)
+        cb05 = Vessel.objects.get(vessel_id="CB-05")
+        custom_resp = self.client.post(
+            reverse("trips:create"),
+            data={
+                "vessel": cb05.pk,
+                "destination": "Platform C",
+                "mission_type": "Material Delivery",
+                "departure_time": "10:00",
+                "passengers": 10,
+                "cargo_tonnes": 2.5,
+                "weather": "Moderate",
+                "priority": "Urgent",
+                "flexible_window": "on",
+                "notes": "Pipe & valve manifest",
+            },
+        )
+        self.assertEqual(custom_resp.status_code, 200)
+        custom_trip = Trip.objects.get(trip_id="TR-LIVE-002")
+        self.assertEqual(custom_trip.vessel, cb05)
+        self.assertEqual(custom_trip.destination, "Platform C")
+        self.assertEqual(custom_trip.mission_type, "Material Delivery")
+        self.assertEqual(custom_trip.weather, "Moderate")
+        self.assertEqual(custom_trip.priority, "Urgent")
+        self.assertContains(custom_resp, "Shift Request Queued")
+        self.assertContains(custom_resp, "TR-LIVE-002")
+        self.assertContains(custom_resp, "CB-05")
+        self.assertContains(custom_resp, "Platform C")
