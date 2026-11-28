@@ -1,136 +1,179 @@
-# Maritime Control Tower Design System
+# Hybrid Maritime Command Design System
 
 > **Mandatory UI Contract for Both Teams & AI Agents:**
-> Follow this specification across `/`, `/trips/`, `/optimizer/`, and `/safety/` on our zero-build CDN stack (**Tailwind CSS Play CDN + DaisyUI 4.12 + HTMX 2 + Alpine.js 3 + Chart.js 4**). Foundational tokens and fonts are already loaded in `templates/base.html`.
+> Follow this specification across `/`, `/trips/`, `/optimizer/`, and `/safety/` on our zero-build CDN stack (**Tailwind CSS Play CDN + DaisyUI 4.12 + HTMX 2 + Alpine.js 3 + Chart.js 4**). All fonts, color tokens, sidebar shell, and surface helpers are preloaded in `templates/base.html`.
 
 ---
 
-## 1. Aesthetic Direction — "Offshore Precision · Maritime Industrial Light"
-- **Tone:** Crisp, high-contrast offshore dispatch control tower built for marine operations supervisors—calm neutral surfaces with sharp semantic telemetry, never consumer-SaaS fluff.
-- **Surfaces:**
-  - Page canvas: `bg-slate-50` (`#F8FAFC`)
-  - Primary card/panel: `bg-white rounded-xl border border-slate-200/90 shadow-xs`
-  - Subtle nested inset / well: `bg-slate-50/80 rounded-lg border border-slate-200/70`
-  - Top command navbar: Deep Maritime Navy `#0B192C` (`bg-[#0B192C]`)
-- **Rule:** Operational light mode only. Never add dark-mode toggles, neon/rainbow gradients, or decorative shadows.
+## 1. Aesthetic Direction — "Hybrid Maritime Command"
+- **Shell:** Deep Maritime Navy fixed left sidebar (`#0A1628`, responsive drawer on mobile) paired with an airy, high-readability light operational workspace (`#F6F8FB`) and frosted sticky topbar (`bg-white/85 backdrop-blur-md`).
+- **Cards & Depth:** Crisp white elevated surfaces (`.surface-card`: `#FFFFFF`, hairline `rgba(226,232,240,0.92)` border, subtle two-step elevation shadow, `14px` radius).
+- **Template Blocks Available in `templates/base.html`:**
+  - `{% block title %}` — `<title>` tag (`Page · CrudeInference · KGOC Marine Fleet`)
+  - `{% block topbar_title %}` — Sticky topbar breadcrumb/title
+  - `{% block topbar_actions %}` — Optional right-aligned topbar action button or shift pill
+  - `{% block content %}` — Main 3-band workspace
+  - `{% block extra_scripts %}` — Page-specific Chart.js / Alpine scripts
+- **Preloaded Utility Classes in `templates/base.html`:**
+  - `.surface-card`, `.surface-card-hover`
+  - `.kpi-accent-teal`, `.kpi-accent-emerald`, `.kpi-accent-amber`, `.kpi-accent-rose`, `.kpi-accent-indigo`
+  - `.ai-copilot-surface` (gradient surface reserved strictly for Gemini 4 Co-Pilot panels)
+  - `.tabular-nums`, `.htmx-indicator`, `.htmx-hide-on-request`, `.htmx-fade-in`
 
 ---
 
 ## 2. Strict Semantic Color Tokens (Never Decorative)
 
-| Role | Token / Hex | Tailwind / Utility Classes | Use Strictly For |
+| Role | Token / Hex | Classes / Surface | Use Strictly For |
 |---|---|---|---|
-| **Command Chrome** | `#0B192C` | `bg-[#0B192C] text-slate-100` | Top navbar shell |
-| **Primary Action** | Offshore Teal `#0F766E` | `btn btn-primary` or `bg-teal-700 hover:bg-teal-800 text-white` | Primary CTAs (`Submit`, `Run Solver`, `Approve & Save`) |
-| **Healthy / Savings / AI `approve`** | Emerald `#059669` | `bg-emerald-50 text-emerald-800 border border-emerald-200` | KWD/fuel/CO₂ savings, optimal utilization, approved merges |
-| **Warning / Half-Empty / AI `review`** | Amber `#D97706` | `bg-amber-50 text-amber-900 border border-amber-200` | Under-utilized runs (`< 50%`), `review` merges, pending states |
-| **Critical / HSE Hold / Anomaly / AI `hold`** | Rose `#E11D48` | `bg-rose-50 text-rose-800 border border-rose-200` | Fuel outliers, active HSE holds, `hold` merges, validation errors |
-| **Embedded Bonus AI ONLY** | Deep Indigo `#4338CA` | `bg-indigo-50/70 border border-indigo-200 text-indigo-950` | Gemini 4 Dispatch Co-Pilot card & AI badges (separates AI from Python math) |
-| **Neutral Ink** | Slate 900 / 600 / 500 | `text-slate-900`, `text-slate-600`, `text-slate-500` | Headings/numbers, body copy, eyebrows/timestamps |
+| **Command Chrome** | `#0A1628` | `bg-[#0A1628] text-slate-100` | Left app sidebar (`base.html`) |
+| **Workspace Canvas** | `#F6F8FB` | `bg-[#F6F8FB]` | Page canvas behind cards |
+| **Primary Action** | Offshore Teal `#0D9488` | `btn btn-primary` / `bg-teal-600 hover:bg-teal-700 text-white` | Primary CTAs (`Log Trip`, `Run Solver`, `Approve & Save`) |
+| **Savings / Optimal / AI `approve`** | Emerald `#059669` | `bg-emerald-50 text-emerald-800 border border-emerald-200` | KWD/fuel/CO₂ savings, optimal load (`70–95%`), AI `Approve` |
+| **Warning / Half-Empty / AI `review`** | Amber `#D97706` | `bg-amber-50 text-amber-900 border border-amber-200` | Half-empty trips (`< 50%`), `Pending` status, AI `Review` |
+| **Critical / HSE Hold / Outlier / AI `hold`** | Rose `#E11D48` | `bg-rose-50 text-rose-800 border border-rose-200` | Fuel anomalies, active HSE holds, AI `Hold`, errors |
+| **Embedded Bonus AI ONLY** | Electric Indigo `#4F46E5` | `.ai-copilot-surface` / `bg-indigo-600 text-white` | Gemini 4 Co-Pilot cards, badges, and AI rationale |
+| **Neutral Ink** | Slate 900 / 600 / 500 | `text-slate-900`, `text-slate-600`, `text-slate-500` | Primary numbers/titles, body copy, labels/timestamps |
 
-> **DaisyUI Override Note:** `templates/base.html` overrides `[data-theme="corporate"]` CSS variables (`--p`, `--su`, `--wa`, `--er`) so `btn-primary`, `badge-success`, `badge-warning`, and `badge-error` align with these hex tokens. Avoid unstyled DaisyUI `btn-secondary` (default pink).
+> **DaisyUI Rule:** `[data-theme="corporate"]` variables are tuned in `base.html` (`--p: 56% 0.11 180`, `--su`, `--wa`, `--er`). Use `btn-primary`, `btn-outline`, or explicit Tailwind semantic classes—never use unstyled DaisyUI `btn-secondary` (default pink).
 
 ---
 
-## 3. Typography & Tabular Telemetry
-- **Fonts:** `Inter` (`font-sans`) for UI labels/prose; `JetBrains Mono` (`font-mono`) for IDs, vessel codes, timestamps, and KPI figures.
-- **Mandatory `tabular-nums` Rule:** Every KPI figure, KWD cost, fuel liter count, kg CO₂, passenger/tonnage ratio, percentage, and numeric table cell MUST include `font-mono tabular-nums` (and `text-right` in tables).
-- **Scale:**
-  - Slice Eyebrow: `text-xs font-semibold uppercase tracking-wider text-teal-700`
-  - Page `h1`: `text-2xl font-bold tracking-tight text-slate-900`
-  - Subtitle: `text-sm text-slate-600 mt-1`
-  - Card Title `h2`: `text-base font-semibold text-slate-900`
-  - KPI Label: `text-xs font-medium uppercase tracking-wide text-slate-500`
-  - KPI Value: `text-2xl sm:text-3xl font-bold font-mono tabular-nums text-slate-900`
-  - Explicit Units: Always pair numbers with explicit units (`KWD`, `L`, `kg CO₂`, `pax`, `t`, `%`, `hrs`).
+## 3. Typography, Telemetry & No-Emoji Policy
+- **Fonts:** `Plus Jakarta Sans` (`font-sans`) for headings, labels, and copy; `JetBrains Mono` (`font-mono`) for trip/vessel IDs, timestamps, capacities, and metrics.
+- **Mandatory `tabular-nums` Rule:** Every KPI figure, KWD amount, fuel liter count, kg CO₂, passenger/tonnage ratio, percentage, and numeric table column MUST use `font-mono tabular-nums` (right-aligned in tables).
+- **Explicit Units:** Always pair values with explicit units (`KWD`, `L`, `kg CO₂`, `pax`, `t`, `%`, `hrs`).
+- **No-Emoji Policy:** Never use emojis in nav items, KPI headers, badges, or alerts. Use clean `16px–20px` inline stroke SVG icons (`stroke-width="1.75"`).
 
 ---
 
 ## 4. Standard 3-Band Page Anatomy
-Every page (`/`, `/trips/`, `/optimizer/`, `/safety/`) follows this layout inside `<main>`:
-
-1. **Band 1 — Header Band:** Eyebrow + `h1` + 1-line operational subtitle on the left; primary CTA or live status summary on the right (`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4`).
-2. **Band 2 — KPI Strip (4 Cards):** `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4`.
-3. **Band 3 — Workspace Grid:** `grid grid-cols-1 lg:grid-cols-12 gap-6` (typically `lg:col-span-8` primary ledger/solver table + `lg:col-span-4` action form / Gemini Co-Pilot sidebar).
+Every slice (`/`, `/trips/`, `/optimizer/`, `/safety/`) follows this structure inside `{% block content %}`:
+1. **Band 1 — Header Band:** Eyebrow (`text-xs font-semibold uppercase tracking-wider text-teal-700`) + `h1` (`text-2xl font-bold tracking-tight text-slate-900`) + 1-line operational subtitle on left; primary CTA / status pill on right (`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6`).
+2. **Band 2 — KPI Strip (4 Cards):** `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6`.
+3. **Band 3 — Workspace Grid:** `grid grid-cols-1 lg:grid-cols-12 gap-6` (typically `lg:col-span-8` primary table/solver + `lg:col-span-4` action form / Gemini Co-Pilot sidebar).
 
 ---
 
-## 5. Copy-Paste Component Recipes
+## 5. Signature Component Recipes (Copy-Paste Ready)
 
-### A. KPI Stat Card
+### 1. KPI Telemetry Card
 ```html
-<div class="bg-white rounded-xl border border-slate-200/90 shadow-xs p-4">
-  <div class="text-xs font-medium uppercase tracking-wide text-slate-500">Est. Shift Savings</div>
-  <div class="mt-1.5 flex items-baseline gap-1.5">
-    <span class="text-2xl font-bold font-mono tabular-nums text-emerald-700">1,420</span>
+<div class="surface-card kpi-accent-emerald p-4">
+  <div class="flex items-center justify-between gap-2">
+    <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Est. 90-Day Savings</span>
+    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    </span>
+  </div>
+  <div class="mt-2 flex items-baseline gap-1.5">
+    <span class="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-emerald-700">14,820</span>
     <span class="text-xs font-semibold text-slate-500">KWD</span>
   </div>
-  <p class="mt-1 text-xs text-slate-500">4 half-empty runs consolidated</p>
+  <p class="mt-1 text-xs text-slate-500 font-mono tabular-nums">98,800 L diesel · 264.8 t CO₂ avoided</p>
 </div>
 ```
 
-### B. Operational Panel Card
+### 2. Visual Vessel Capacity Bar (Utilization Telemetry)
+Color mapping: `< 50%` Amber (`bg-amber-500`), `50–69%` Teal (`bg-teal-600`), `70–95%` Emerald (`bg-emerald-600`), `> 95%` Rose (`bg-rose-600`).
 ```html
-<section class="bg-white rounded-xl border border-slate-200/90 shadow-xs">
+<div class="flex items-center justify-end gap-2.5">
+  <div class="w-20 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+    <div class="h-full rounded-full bg-amber-500" style="width: 30%"></div>
+  </div>
+  <span class="font-mono tabular-nums text-xs text-slate-700 w-16 text-right">6/20 · 30%</span>
+</div>
+```
+
+### 3. Before → After Consolidation Diff Card (`/optimizer/`)
+```html
+<div class="surface-card p-4 space-y-3 htmx-fade-in">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <label class="flex items-center gap-2.5 cursor-pointer">
+      <input type="checkbox" name="selected_merges" value="{{ merge.id }}"
+             class="checkbox checkbox-primary checkbox-sm" {% if merge.checked %}checked{% endif %} />
+      <span class="text-sm font-semibold text-slate-900">Mina → Khafji Platform A · 08:00 Window</span>
+    </label>
+    <div class="flex items-center gap-1.5">
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono tabular-nums">-1 Trip · +185 KWD</span>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">AI: Approve</span>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-11 gap-3 items-center text-xs">
+    <div class="md:col-span-5 rounded-lg bg-amber-50/70 border border-amber-200/80 p-3 space-y-1">
+      <div class="font-semibold uppercase tracking-wider text-[10px] text-amber-800">Before (2 Half-Empty Runs)</div>
+      <div class="font-mono tabular-nums text-slate-700">#TR-104 (5/20 pax) + #TR-109 (4/20 pax)</div>
+    </div>
+    <div class="md:col-span-1 flex justify-center text-teal-700 font-bold">→</div>
+    <div class="md:col-span-5 rounded-lg bg-emerald-50/70 border border-emerald-200/80 p-3 space-y-1">
+      <div class="font-semibold uppercase tracking-wider text-[10px] text-emerald-800">After (1 Consolidated Sailing)</div>
+      <div class="font-mono tabular-nums text-slate-900 font-medium">Al-Khafji · 9/20 pax (45%) · 410 L saved</div>
+    </div>
+  </div>
+</div>
+```
+
+### 4. Actionable Gemini 4 AI Co-Pilot Card (`.ai-copilot-surface`)
+```html
+<section class="ai-copilot-surface p-5 space-y-4 htmx-fade-in">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <div class="flex items-center gap-2">
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-indigo-600 text-white">
+        Gemini 4 Co-Pilot
+      </span>
+      <h2 class="text-sm font-semibold text-indigo-950">Dispatch Risk &amp; Handover Review</h2>
+    </div>
+    {% if ai_fallback_used %}
+    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-900 border border-amber-200">Deterministic Fallback</span>
+    {% else %}
+    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 border border-indigo-200 font-mono">gemini-4-hydrogen</span>
+    {% endif %}
+  </div>
+  <p class="text-sm text-slate-700 leading-relaxed">{{ briefing.executive_summary }}</p>
+</section>
+```
+
+### 5. HSE Safety Override Alert Banner & Rule Card (`/optimizer/` & `/safety/`)
+```html
+<div class="rounded-xl border border-rose-200 bg-rose-50/80 border-l-4 border-l-rose-600 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div>
+    <div class="text-xs font-semibold uppercase tracking-wider text-rose-800">Active HSE Override</div>
+    <p class="text-sm font-medium text-slate-900 mt-0.5">Maintenance Hold on MV Safaniya — excluded from all automated merges.</p>
+  </div>
+  <a href="{% url 'safety:index' %}" class="btn btn-xs bg-white border-rose-200 text-rose-800 hover:bg-rose-100">Manage Holds</a>
+</div>
+```
+
+### 6. Responsive Data Table
+```html
+<section class="surface-card overflow-hidden">
   <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
     <div>
-      <h2 class="text-base font-semibold text-slate-900">Pending Shift Queue</h2>
-      <p class="text-xs text-slate-500">Requests eligible for consolidation</p>
+      <h2 class="text-base font-semibold text-slate-900">Fleet Trip Ledger</h2>
+      <p class="text-xs text-slate-500">976 historical sailings + live pending requests</p>
     </div>
-    <!-- Optional right action/pill -->
   </div>
-  <div class="p-5">
-    <!-- Body -->
+  <div class="overflow-x-auto">
+    <table class="table table-sm w-full">
+      <thead>
+        <tr class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider border-b border-slate-200">
+          <th>Trip ID</th>
+          <th>Route &amp; Vessel</th>
+          <th class="text-right">Load</th>
+          <th class="text-right">Fuel (L)</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100 text-sm">
+        <!-- rows with font-mono tabular-nums on IDs and numeric cells -->
+      </tbody>
+    </table>
   </div>
 </section>
 ```
 
-### C. Responsive Data Table
-```html
-<div class="overflow-x-auto">
-  <table class="table table-sm w-full">
-    <thead>
-      <tr class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
-        <th>Trip ID</th>
-        <th>Route &amp; Vessel</th>
-        <th class="text-right">Pax</th>
-        <th class="text-right">Fuel (L)</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-slate-100 text-sm">
-      <tr class="hover:bg-slate-50/70">
-        <td class="font-mono tabular-nums text-xs text-slate-600">#TR-0981</td>
-        <td>
-          <div class="font-medium text-slate-900">Mina → Khafji Platform A</div>
-          <div class="text-xs text-slate-500">Al-Khafji · Crew Boat</div>
-        </td>
-        <td class="text-right font-mono tabular-nums">6 / 20</td>
-        <td class="text-right font-mono tabular-nums">420</td>
-        <td><!-- Semantic Pill --></td>
-      </tr>
-    </tbody>
-  </table>
-</div>
-```
-
-### D. Semantic Status Pills
-```html
-<!-- Healthy / Approved / Optimal -->
-<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">Approve</span>
-
-<!-- Half-Empty (<50%) / Review / Pending -->
-<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-900 border border-amber-200">Half-Empty (30%)</span>
-
-<!-- HSE Hold / Fuel Outlier / AI Hold -->
-<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200">HSE Hold</span>
-
-<!-- Neutral / Completed -->
-<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">Completed</span>
-```
-
-### E. HTMX Action Button with Loading State (Solver & Gemini Co-Pilot)
-Always use `hx-indicator` + `hx-disabled-elt="this"` so multi-second requests (like Gemini 4 calls) give immediate visual feedback and prevent double-submits:
+### 7. HTMX Action Button + Loading Indicator & Accessible Forms
+Always pair `hx-indicator` + `hx-disabled-elt="this"` on solver/AI buttons, and use explicit `<label for="...">` tags on inputs:
 ```html
 <button
   type="button"
@@ -140,7 +183,7 @@ Always use `hx-indicator` + `hx-disabled-elt="this"` so multi-second requests (l
   hx-swap="innerHTML"
   hx-indicator="#ai-spinner"
   hx-disabled-elt="this">
-  <span class="htmx-hide-on-request">Generate AI Dispatch Briefing</span>
+  <span class="htmx-hide-on-request">Run AI Risk Review</span>
   <span id="ai-spinner" class="htmx-indicator items-center gap-2">
     <span class="loading loading-spinner loading-xs"></span>
     Analyzing merges…
@@ -148,69 +191,32 @@ Always use `hx-indicator` + `hx-disabled-elt="this"` so multi-second requests (l
 </button>
 ```
 
-### F. Actionable Gemini AI Co-Pilot Panel (Deep Indigo Accent)
-```html
-<section class="bg-indigo-50/60 rounded-xl border border-indigo-200 p-5 space-y-3">
-  <div class="flex items-center justify-between gap-2">
-    <div class="flex items-center gap-2">
-      <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-indigo-700 text-white">Gemini 4 Co-Pilot</span>
-      <h2 class="text-sm font-semibold text-indigo-950">Dispatch Risk &amp; Handover Review</h2>
-    </div>
-    {% if ai_fallback_used %}
-    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-900 border border-amber-200">Deterministic Fallback</span>
-    {% endif %}
-  </div>
-  <p class="text-sm text-slate-700 leading-relaxed">{{ briefing.executive_summary }}</p>
-  <!-- Per-merge decision cards with Approve/Review/Hold pills -->
-</section>
-```
-
-### G. Form Controls (Accessible & Compact)
-```html
-<div class="space-y-3">
-  <div>
-    <label for="id_pax_count" class="block text-xs font-semibold text-slate-700 mb-1">
-      Passengers (pax)
-    </label>
-    <input id="id_pax_count" name="pax_count" type="number" min="0"
-           class="input input-bordered input-sm w-full bg-white font-mono tabular-nums" required />
-  </div>
-  <div>
-    <label for="id_vessel" class="block text-xs font-semibold text-slate-700 mb-1">
-      Assigned Vessel
-    </label>
-    <select id="id_vessel" name="vessel" class="select select-bordered select-sm w-full bg-white" required>
-      <!-- options -->
-    </select>
-  </div>
-</div>
-```
-
-### H. Chart.js 4 Standard Configuration
-Always place `<canvas>` inside a fixed-height container (`relative h-64`) to prevent layout shifts:
-```html
-<div class="relative h-64 w-full">
-  <canvas id="fleetUtilizationChart"></canvas>
-</div>
-<script>
-  const CHART_PALETTE = {
-    teal: '#0F766E',
-    amber: '#D97706',
-    rose: '#E11D48',
-    indigo: '#4338CA',
-    slate: '#64748B',
-    grid: '#E2E8F0',
-  };
-  // Use responsive: true, maintainAspectRatio: false,
-  // font: { family: "'Inter', sans-serif" }, and clean borderRadius: 6 on bars.
-</script>
+### 8. Chart.js 4 Standard Config
+Always wrap `<canvas>` in `<div class="relative h-64 w-full">` to prevent layout shifts:
+```javascript
+const CHART_PALETTE = {
+  teal: '#0D9488',
+  emerald: '#059669',
+  amber: '#D97706',
+  rose: '#E11D48',
+  indigo: '#4F46E5',
+  navy: '#0A1628',
+  grid: '#E2E8F0',
+};
+// Standard options:
+// responsive: true, maintainAspectRatio: false,
+// plugins.legend.labels.font = { family: "'Plus Jakarta Sans', sans-serif", size: 12 },
+// plugins.tooltip.backgroundColor = '#0A1628',
+// scales.x.grid.display = false,
+// scales.y.grid.color = '#E2E8F0', scales.y.border = { dash: [4, 4], display: false },
+// bar datasets: borderRadius: 6, borderSkipped: false.
 ```
 
 ---
 
 ## 6. Anti-Patterns Checklist (Do Not Ship)
-- Do **not** leave starter/developer copy (`Teammate A`, `apps/trips/`, `Ready for Feature 1...`) in finished slice templates.
+- Do **not** leave starter/developer copy (`Teammate A`, `apps/trips/`, `Ready for Feature 1...`) in final slice templates.
 - Do **not** add dark mode toggles, unrequested login screens, or standalone static pages.
-- Do **not** render raw floats without rounding/units (format KWD to 2 decimals or integer, liters/kg cleanly, percentages with `%`).
-- Do **not** place charts without a fixed-height wrapper (`h-64` / `h-72`).
-- Do **not** omit `hx-indicator` / `hx-disabled-elt="this"` on async HTMX actions.
+- Do **not** use emojis anywhere in the UI (use inline stroke SVGs).
+- Do **not** render raw unformatted floats (format KWD cleanly, percentages with `%`, liters/kg with commas).
+- Do **not** omit `hx-indicator` / `hx-disabled-elt="this"` on HTMX actions or fixed `h-64` / `h-72` wrappers on Chart.js canvases.
