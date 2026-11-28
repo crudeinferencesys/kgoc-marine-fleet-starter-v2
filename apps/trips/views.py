@@ -21,7 +21,12 @@ from apps.core.constants import (
 )
 from apps.core.models import SafetyOverride, Trip, Vessel
 from apps.trips.forms import TripBookingForm
-from apps.trips.services import filter_trips, get_trips_kpis, get_vessels_meta
+from apps.trips.services import (
+    DESTINATION_DISTANCES_NM,
+    filter_trips,
+    get_trips_kpis,
+    get_vessels_meta,
+)
 
 
 def _csv_safe(value: object) -> str:
@@ -60,6 +65,10 @@ def _build_trips_context(
         "vessels": list(Vessel.objects.order_by("vessel_id")),
         "vessel_types": list(VESSEL_TYPES),
         "destinations": list(DESTINATIONS),
+        "destination_options": [
+            {"name": dest, "distance_nm": int(DESTINATION_DISTANCES_NM.get(dest, 36.0))}
+            for dest in DESTINATIONS
+        ],
         "mission_types": list(MISSION_TYPES),
         "weather_states": list(WEATHER_STATES),
         "priorities": list(PRIORITIES),

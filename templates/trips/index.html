@@ -62,21 +62,24 @@
 
 {% block content %}
 <div x-data="{
-       activeTab: 'ledger',
+       activeTab: new URLSearchParams(window.location.search).get('book') === '1' ? 'book' : 'ledger',
        inspectorOpen: false,
-       bookingOpen: new URLSearchParams(window.location.search).get('book') === '1',
        switchTab(tab) {
          this.activeTab = tab;
+         if (tab === 'book') {
+           this.inspectorOpen = false;
+         }
          if (tab === 'analytics') {
            this.$nextTick(() => window.dispatchEvent(new CustomEvent('trips-analytics:shown')));
          }
        }
      }"
-     @trip-inspector:open.window="inspectorOpen = true; bookingOpen = false"
+     @trip-inspector:open.window="inspectorOpen = true"
      @trip-inspector:close.window="inspectorOpen = false"
-     @trip-booking:open.window="bookingOpen = true; inspectorOpen = false"
-     @trip-booking:close.window="bookingOpen = false"
-     @keydown.escape.window="inspectorOpen = false; bookingOpen = false">
+     @trip-booking:open.window="switchTab('book')"
+     @trip-booking:close.window="switchTab('ledger')"
+     @trips-tab:ledger.window="switchTab('ledger')"
+     @keydown.escape.window="inspectorOpen = false">
 {{ kpis.vessel_chart_data|json_script:"trips-vessel-chart-data" }}
 {{ vessels_meta|json_script:"vessels-meta-data" }}
 
@@ -109,16 +112,38 @@
             class="px-3 py-1 rounded-md text-xs font-semibold transition-all">
       Fleet Analytics
     </button>
+    <button type="button"
+            role="tab"
+            :aria-selected="(activeTab === 'book').toString()"
+            @click="switchTab('book')"
+            :class="activeTab === 'book' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+            class="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold transition-all">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 5v14" /><path d="M5 12h14" />
+      </svg>
+      Log New Trip
+    </button>
   </div>
 
   <div class="flex flex-wrap items-center gap-2 shrink-0">
     <button type="button"
-            @click="bookingOpen = true; inspectorOpen = false"
+            x-show="activeTab !== 'book'"
+            @click="switchTab('book')"
             class="btn btn-primary btn-xs gap-1.5">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M12 5v14" /><path d="M5 12h14" />
       </svg>
       Log Shift Trip
+    </button>
+    <button type="button"
+            x-show="activeTab === 'book'"
+            x-cloak
+            @click="switchTab('ledger')"
+            class="btn btn-outline btn-xs border-slate-300 text-slate-700 hover:bg-slate-100 gap-1">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m15 18-6-6 6-6" />
+      </svg>
+      Back to Ledger
     </button>
     <a href="{% url 'safety:index' %}" class="btn btn-outline btn-xs border-slate-300 text-slate-700 hover:bg-slate-100 gap-1">
       HSE Holds
@@ -129,8 +154,8 @@
   </div>
 </div>
 
-<!-- Band 2: Compact 4-Card KPI Ribbon -->
-<div data-scroll-section data-scroll-label="Fleet KPIs">
+<!-- Band 2: Compact 4-Card KPI Ribbon (hidden cleanly while booking workflow is active, stays in DOM for OOB) -->
+<div x-show="activeTab !== 'book'" data-scroll-section data-scroll-label="Fleet KPIs">
   {% include "trips/partials/kpi_strip.html" %}
 </div>
 
@@ -202,46 +227,23 @@
   </section>
 </div>
 
-<!-- Shared Backdrop for Slide-Over Drawers -->
-<div x-show="inspectorOpen || bookingOpen"
+<!-- Band 3C: Dedicated Single-Screen Simple-Menu Log New Trip Workflow -->
+<section id="trip-booking-workflow"
+         x-show="activeTab === 'book'"
+         x-cloak
+         data-scroll-section
+         data-scroll-label="Log New Trip"
+         class="max-w-4xl mx-auto">
+  {% include "trips/partials/booking_form.html" %}
+</section>
+
+<!-- Backdrop for Slide-Over Trip Inspector Drawer -->
+<div x-show="inspectorOpen"
      x-cloak
      x-transition.opacity.duration.200ms
-     @click="inspectorOpen = false; bookingOpen = false"
+     @click="inspectorOpen = false"
      class="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm"
      aria-hidden="true"></div>
-
-<!-- Right Slide-Over Single-Screen Progressive Booking Drawer -->
-<aside id="booking-drawer"
-       x-show="bookingOpen"
-       x-cloak
-       x-transition:enter="transition ease-out duration-200"
-       x-transition:enter-start="translate-x-full"
-       x-transition:enter-end="translate-x-0"
-       x-transition:leave="transition ease-in duration-150"
-       x-transition:leave-start="translate-x-0"
-       x-transition:leave-end="translate-x-full"
-       class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white border-l border-slate-200 shadow-2xl flex flex-col"
-       role="dialog"
-       aria-modal="true"
-       aria-labelledby="booking-drawer-title">
-  <div class="px-5 h-14 border-b border-slate-200/80 flex items-center justify-between gap-3 shrink-0">
-    <div>
-      <h2 id="booking-drawer-title" class="text-sm font-semibold text-slate-900">Log Shift Trip Request</h2>
-      <p class="text-[11px] text-slate-500">3 quick decisions with smart defaults</p>
-    </div>
-    <button type="button"
-            @click="bookingOpen = false"
-            class="btn btn-ghost btn-xs btn-square text-slate-500 hover:text-slate-900"
-            aria-label="Close trip booking form">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M18 6 6 18" /><path d="m6 6 12 12" />
-      </svg>
-    </button>
-  </div>
-  <div class="flex-1 overflow-y-auto p-5">
-    {% include "trips/partials/booking_form.html" %}
-  </div>
-</aside>
 
 <!-- Right Slide-Over Trip Inspector Drawer -->
 <aside id="trip-inspector-drawer"
