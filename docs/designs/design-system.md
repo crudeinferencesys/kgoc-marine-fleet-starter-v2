@@ -48,11 +48,11 @@
 
 ---
 
-## 4. Standard 3-Band Page Anatomy
-Every slice (`/`, `/trips/`, `/optimizer/`, `/safety/`) follows this structure inside `{% block content %}`:
-1. **Band 1 — Header Band:** Eyebrow (`text-xs font-semibold uppercase tracking-wider text-teal-700`) + `h1` (`text-2xl font-bold tracking-tight text-slate-900`) + 1-line operational subtitle on left; primary CTA / status pill on right (`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6`).
-2. **Band 2 — KPI Strip (4 Cards):** `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6`.
-3. **Band 3 — Workspace Grid:** `grid grid-cols-1 lg:grid-cols-12 gap-6` (typically `lg:col-span-8` primary table/solver + `lg:col-span-4` action form / Gemini Co-Pilot sidebar).
+## 4. Zero-Scroll Cockpit & 3-Band Page Anatomy
+Every slice (`/`, `/trips/`, `/optimizer/`, `/safety/`, `/copilot/`) fits inside a single desktop viewport without page scrolling by organizing the 3 bands with tabs and slide-over drawers:
+1. **Band 1 — Compact Header + Tab Switcher:** Single-row `h1` (`text-xl font-bold`), live count pill, segmented view tabs (`Live Map | Fleet Analytics | Operations Hub` or `Ledger | Analytics`), and primary CTA / `Export CSV` action (`mb-3`).
+2. **Band 2 — Compact KPI Ribbon (4 Cards):** `grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3` (`p-3`, `text-xl sm:text-2xl`) showing headline figure + inline unit + right-aligned mono context.
+3. **Band 3 — Tabbed Workspace + Slide-Over Drawers:** Only one primary workspace band is shown per tab, tables default to **8 rows per page** (`8 / 15 / 25` switcher) with filtered **CSV export** for deep dives, and secondary forms/inspectors open in right-side Alpine slide-over drawers (`z-50`).
 
 ---
 
@@ -252,8 +252,8 @@ Keep user input on a single screen: pre-fill probable operational defaults (`Fle
 </form>
 ```
 
-### 3. Gaming-Inspired Complex Discovery (Preset Chips + Facets + Slide-Over Inspector)
-Avoid deep dropdown trees for the 988-trip ledger. Pair 1-click **DIM-style saved filter presets** (with live counts) and removable active-filter chips with a right-side **Alpine Slide-Over Inspector** (`TR-00012`) so users never lose table scroll position:
+### 3. Simple 1-Line Filters + Power-User Advanced Menu + Paginated Export
+Keep the primary control bar to one line: search input + 3–4 quick preset chips, an **`Advanced Filters` popover menu** for power users (multi-facet status, vessel, destination, weather, fuel audit), and an **`Export CSV`** link matching the active filters. Tables paginate to `8` rows by default (`8 / 15 / 25` selector), and clicking any row opens a right-side **Alpine Slide-Over Inspector** (`TR-00012`) without losing context.
 ```html
 <div class="flex flex-wrap items-center gap-1.5 mb-3">
   <button hx-get="{% url 'trips:index' %}?preset=all" class="btn btn-xs rounded-full">All <span class="font-mono tabular-nums">988</span></button>

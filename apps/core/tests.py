@@ -364,6 +364,23 @@ class CoreSmokeTests(TestCase):
         self.assertContains(seeded_response, "Platform A")
         self.assertContains(seeded_response, "kjoTacticalMap")
 
+    def test_control_tower_zero_scroll_tabs_and_fleet_csv_export(self):
+        call_command("seed_fleet", if_empty=True, stdout=io.StringIO())
+        home_response = self.client.get(reverse("core:home"))
+        self.assertEqual(home_response.status_code, 200)
+        self.assertContains(home_response, "Live Map")
+        self.assertContains(home_response, "Fleet Analytics")
+        self.assertContains(home_response, "Operations Hub")
+        self.assertContains(home_response, reverse("core:export_fleet_csv"))
+
+        csv_response = self.client.get(reverse("core:export_fleet_csv"))
+        self.assertEqual(csv_response.status_code, 200)
+        self.assertIn("text/csv", csv_response["Content-Type"])
+        self.assertIn("kgoc_fleet_summary.csv", csv_response["Content-Disposition"])
+        body = csv_response.content.decode("utf-8")
+        self.assertIn("CB-01", body)
+        self.assertIn("CB-08", body)
+
     def test_copilot_4th_feature_route_and_navigation(self):
         home_response = self.client.get(reverse("core:home"))
         self.assertEqual(home_response.status_code, 200)
