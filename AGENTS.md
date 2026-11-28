@@ -60,6 +60,7 @@ Two AI agents are editing this repository in parallel, and merging to `main` **a
 - **Backend:** Django 5.2 LTS. Local dev uses SQLite (`db.sqlite3`); Cloud Run prod uses Cloud SQL PostgreSQL via Unix socket (`/cloudsql/<CLOUD_SQL_CONNECTION_NAME>`).
 - **SQLite / Postgres Parity Rule:** NEVER use PostgreSQL-only Django ORM fields (`ArrayField`, `HStoreField`, `CIEmailField`) or raw Postgres-specific SQL. Stick to portable Django ORM fields (`CharField`, `TextField`, `IntegerField`, `FloatField`, `DecimalField`, `BooleanField`, `DateTimeField`, `JSONField`, `ForeignKey`).
 - **Frontend:** Zero-build CDN stack in `templates/base.html` (**Tailwind CSS Play CDN + DaisyUI 4.12 + HTMX 2 + Alpine.js 3 + Chart.js 4**).
+  - Follow `docs/designs/design-system.md` strictly for palette, typography (`tabular-nums`), KPI cards, tables, HTMX loading states, Gemini AI Co-Pilot styling, and Chart.js configs so parallel slices look unified.
   - Rely on the global `hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'` already set on `<body>`.
   - Keep HTMX responses as small, focused HTML partials under `templates/<slice>/partials/`.
   - Design mobile-responsive layouts (`grid-cols-1 md:grid-cols-...`, DaisyUI cards/tables/badges).

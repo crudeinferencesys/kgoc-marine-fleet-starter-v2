@@ -15,6 +15,7 @@ Read these authoritative files in order before proposing architecture or editing
 3. **Design Sitemap & Slice Ownership:** [docs/designs/SITEMAP.md](../../../docs/designs/SITEMAP.md)
 4. **Technical Architecture:** [docs/designs/architecture.md](../../../docs/designs/architecture.md)
 5. **MVP Feature & Data Spec:** [docs/designs/mvp-spec.md](../../../docs/designs/mvp-spec.md)
+6. **UI Design System (Mandatory for All Templates & Charts):** [docs/designs/design-system.md](../../../docs/designs/design-system.md)
 
 ## Key Code Anchors
 - **Frozen Shared Models:** `apps/core/models.py`

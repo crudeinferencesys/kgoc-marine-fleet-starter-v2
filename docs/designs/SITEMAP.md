@@ -7,6 +7,7 @@ Index of active specifications, frozen boundaries, and team ownership.
 |---|---|---|
 | [hackathon_brief.md](../hackathon_brief.md) | Official KGOC + CODED workshop rules & Theme 4 summary | Reference |
 | [architecture.md](architecture.md) | Stack, GCP Cloud Run + Cloud SQL, HTMX, Gemini AI wrapper | Locked |
+| [design-system.md](design-system.md) | Maritime Control Tower palette, typography, KPI/table/HTMX/AI/Chart.js recipes | Locked — follow for all UI & charts |
 | [mvp-spec.md](mvp-spec.md) | Theme 4 dataset schema, Control Tower, 3 core features, Actionable AI, KWD math | Pre-Kickoff Blueprint Locked — confirm columns at 11:00 AM |
 
 ## Vertical Slice Ownership
