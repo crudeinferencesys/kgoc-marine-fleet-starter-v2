@@ -470,3 +470,172 @@ class OptimizerViewsIntegrationTests(OptimizerFixturesMixin, TestCase):
         plan.refresh_from_db()
         self.assertFalse(plan.is_approved)
         self.assertEqual(revert_resp.context["active_tab"], "plans")
+
+
+class OptimizerUiUxPolishTests(OptimizerFixturesMixin, TestCase):
+    def setUp(self):
+        self.vessels = self._create_standard_fleet()
+        SafetyOverride.objects.create(
+            rule_type="standby_lock",
+            vessel=self.vessels["CB-07"],
+            severity="critical",
+            reason="Standby vessel locked",
+            is_active=True,
+        )
+        self.t1 = self._create_pending_trip(
+            trip_id="TR-U1",
+            vessel=self.vessels["CB-01"],
+            destination="Platform A",
+            passengers=5,
+        )
+        self.t2 = self._create_pending_trip(
+            trip_id="TR-U2",
+            vessel=self.vessels["CB-02"],
+            destination="Platform A",
+            passengers=4,
+        )
+        self.r1 = self._create_pending_trip(
+            trip_id="TR-UR1",
+            vessel=self.vessels["CB-02"],
+            destination="Platform C",
+            passengers=4,
+            weather="Rough",
+        )
+        self.s1 = self._create_pending_trip(
+            trip_id="TR-US1",
+            vessel=self.vessels["CB-07"],
+            destination="Platform B",
+            passengers=3,
+        )
+
+    def test_context_ui_helpers_and_seeded_corridor_bars(self):
+        # Empty historical DB -> fuel_bar_pct is 0 across corridors, held_hse_count counts rose holds
+        resp = self.client.get(reverse("optimizer:index"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context["held_hse_count"], 2)  # TR-UR1 (rough) + TR-US1 (standby)
+        self.assertTrue(resp.context["default_plan_name"].startswith("Shift Plan · "))
+        corridors = resp.context["backtest"]["corridors"]
+        self.assertEqual(len(corridors), 5)
+        self.assertTrue(all(row["fuel_bar_pct"] == 0 for row in corridors))
+
+        # Seeded KJO data -> max corridor gets fuel_bar_pct == 100 and all are ints in 0..100
+        from django.core.management import call_command
+
+        call_command("seed_fleet", "--reset")
+        seeded_resp = self.client.get(reverse("optimizer:index"))
+        self.assertEqual(seeded_resp.status_code, 200)
+        seeded_corridors = seeded_resp.context["backtest"]["corridors"]
+        self.assertEqual(len(seeded_corridors), 5)
+        pcts = [row["fuel_bar_pct"] for row in seeded_corridors]
+        self.assertTrue(all(isinstance(p, int) and 0 <= p <= 100 for p in pcts))
+        self.assertEqual(max(pcts), 100)
+        self.assertContains(seeded_resp, 'style="width: 100%"')
+
+    def test_auto_solve_toggles_select_all_dynamic_cta_and_load_bars(self):
+        import re
+
+        resp = self.client.get(reverse("optimizer:index"))
+        self.assertEqual(resp.status_code, 200)
+        html = resp.content.decode("utf-8")
+        solve_url = reverse("optimizer:solve")
+
+        # Both policy toggles auto-solve via HTMX change trigger
+        for input_id in ("opt-strict-weather", "opt-allow-milk-run"):
+            tag = re.search(rf'<input[^>]*\bid="{input_id}"[^>]*>', html)
+            self.assertIsNotNone(tag, f"Missing #{input_id}")
+            self.assertIn(f'hx-post="{solve_url}"', tag.group(0))
+            self.assertIn('hx-trigger="change"', tag.group(0))
+            self.assertIn('hx-include="closest form"', tag.group(0))
+            self.assertIn('hx-target="#optimizer-workspace"', tag.group(0))
+
+        # Select All / Clear toggle, zero-selection disabled state, dynamic CTA, placeholder
+        self.assertContains(resp, "toggleSelectAll()")
+        self.assertContains(resp, "Select All")
+        self.assertContains(resp, 'id="approve-plan-btn"')
+        self.assertContains(resp, ':disabled="selectedCount === 0"')
+        self.assertContains(resp, "btn-sm")
+        self.assertContains(resp, 'x-text="fmtInt(selectedKwd)"')
+        self.assertContains(resp, f'placeholder="{resp.context["default_plan_name"]}"')
+
+        # Before -> After visual load bars, Unicode arrows, no redundant Same Corridor pill
+        self.assertContains(resp, "→")
+        self.assertNotContains(resp, "-&gt;")
+        self.assertNotContains(resp, " -> ")
+        self.assertNotContains(resp, "Same Corridor")
+        self.assertContains(resp, "bg-amber-500")
+        self.assertContains(resp, "After (1 Consolidated Sailing)")
+
+        # Copy & header guardrails: no raw DB jargon, /safety/?tab=holds link, no duplicate topbar CTA
+        self.assertNotContains(resp, "PostgreSQL")
+        self.assertContains(resp, f'href="{reverse("safety:index")}?tab=holds"')
+        self.assertNotContains(resp, "bg-indigo-600 hover:bg-indigo-500")
+
+    def test_clickable_trip_inspectors_and_settle_safe_modal(self):
+        resp = self.client.get(reverse("optimizer:index"))
+        self.assertEqual(resp.status_code, 200)
+
+        # Merge cards and Held Queue expose clickable trips:inspect buttons
+        self.assertContains(
+            resp, f'hx-get="{reverse("trips:inspect", args=["TR-U1"])}"'
+        )
+        self.assertContains(
+            resp, f'hx-get="{reverse("trips:inspect", args=["TR-U2"])}"'
+        )
+        self.assertContains(
+            resp, f'hx-get="{reverse("trips:inspect", args=["TR-UR1"])}"'
+        )
+        self.assertContains(resp, 'hx-target="#optimizer-trip-inspector-body"')
+
+        # Unified right-column tabs & HSE Blocked quick filter
+        self.assertContains(resp, "Held Queue")
+        self.assertContains(resp, "HSE Locks")
+        self.assertContains(resp, "HSE Blocked")
+
+        # Settle-safe modal guard across GET index and HTMX POST solve
+        solve_resp = self.client.post(
+            reverse("optimizer:solve"),
+            {"strict_weather": "1", "allow_milk_run": "0"},
+        )
+        for res in (resp, solve_resp):
+            self.assertEqual(res.status_code, 200)
+            self.assertContains(res, 'id="optimizer-trip-inspector-modal"')
+            self.assertContains(res, 'style="display: none;"')
+            self.assertContains(
+                res, ":class=\"{ 'flex': inspectorOpen, 'hidden': !inspectorOpen }\""
+            )
+            self.assertContains(res, 'class="hidden fixed inset-0')
+            self.assertNotContains(res, 'class="fixed inset-0 z-50 flex')
+            self.assertNotContains(res, "this.$el")
+
+    def test_plans_tab_hides_kpi_ribbon_and_renders_details_plus_two_click_revert(self):
+        approve_resp = self.client.post(
+            reverse("optimizer:approve"),
+            {
+                "strict_weather": "1",
+                "allow_milk_run": "0",
+                "merge_ids": ["TR-U1+TR-U2"],
+                "plan_name": "Polish Shift Plan",
+            },
+        )
+        self.assertEqual(approve_resp.status_code, 200)
+        plan = DispatchPlan.objects.get(name="Polish Shift Plan")
+
+        plans_resp = self.client.get(reverse("optimizer:index"), {"tab": "plans"})
+        self.assertEqual(plans_resp.status_code, 200)
+        self.assertEqual(plans_resp.context["active_tab"], "plans")
+        # KPI ribbon carries x-show="activeTab === 'solver'" and server style="display: none;"
+        self.assertContains(
+            plans_resp,
+            'x-show="activeTab === \'solver\'"\n       style="display: none;"',
+        )
+        # Saved plan Details expand & 2-click inline revert confirm
+        self.assertContains(plans_resp, f"expandedPlanId === {plan.pk}")
+        self.assertContains(plans_resp, "Details")
+        self.assertContains(plans_resp, "TR-U1 + TR-U2 →")
+        self.assertContains(plans_resp, f"confirmRevertId = {plan.pk}")
+        self.assertContains(plans_resp, "Confirm?")
+        self.assertContains(plans_resp, "Cancel")
+        self.assertContains(
+            plans_resp,
+            f'hx-post="{reverse("optimizer:revert_plan", args=[plan.pk])}"',
+        )
