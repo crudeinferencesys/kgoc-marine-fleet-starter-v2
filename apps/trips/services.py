@@ -183,18 +183,31 @@ def filter_trips(params: Mapping[str, Any]) -> dict[str, Any]:
     vessel = str(params.get("vessel") or "").strip()
     destination = str(params.get("destination") or "").strip()
     half_empty = str(params.get("half_empty") or "").strip()
+    raw_anomaly = str(params.get("anomaly") or "").strip().lower()
+    anomaly = raw_anomaly if raw_anomaly in {"high", "low", "missing"} else ""
+    raw_weather = str(params.get("weather") or "").strip()
+    weather = raw_weather if raw_weather in {"Calm", "Moderate", "Rough"} else ""
     q = str(params.get("q") or "").strip()
     page_num = params.get("page") or 1
 
-    counts_agg = Trip.objects.aggregate(
-        all_count=Count("id", filter=~Q(status="cancelled")),
-        pending_count=Count("id", filter=Q(status="pending")),
-        completed_count=Count("id", filter=Q(status="completed")),
+    all_non_cancelled = list(
+        Trip.objects.select_related("vessel").exclude(status="cancelled")
     )
     status_counts = {
-        "all": counts_agg["all_count"],
-        "pending": counts_agg["pending_count"],
-        "completed": counts_agg["completed_count"],
+        "all": len(all_non_cancelled),
+        "pending": sum(1 for trip in all_non_cancelled if trip.status == "pending"),
+        "completed": sum(1 for trip in all_non_cancelled if trip.status == "completed"),
+    }
+    preset_counts = {
+        **status_counts,
+        "half_empty": sum(1 for trip in all_non_cancelled if trip.is_half_empty),
+        "outliers": sum(
+            1 for trip in all_non_cancelled if trip.fuel_anomaly_status == "high"
+        ),
+        "missing_fuel": sum(
+            1 for trip in all_non_cancelled if trip.fuel_anomaly_status == "missing"
+        ),
+        "rough_weather": sum(1 for trip in all_non_cancelled if trip.weather == "Rough"),
     }
 
     qs = Trip.objects.select_related("vessel")
@@ -207,6 +220,8 @@ def filter_trips(params: Mapping[str, Any]) -> dict[str, Any]:
         qs = qs.filter(vessel__vessel_id=vessel)
     if destination:
         qs = qs.filter(destination=destination)
+    if weather:
+        qs = qs.filter(weather=weather)
     if q:
         qs = qs.filter(
             Q(trip_id__icontains=q) | Q(request_id__icontains=q) | Q(notes__icontains=q)
@@ -215,6 +230,8 @@ def filter_trips(params: Mapping[str, Any]) -> dict[str, Any]:
     trips = list(qs)
     if half_empty == "1":
         trips = [trip for trip in trips if trip.is_half_empty]
+    if anomaly:
+        trips = [trip for trip in trips if trip.fuel_anomaly_status == anomaly]
 
     # Pending queue rows always appear before historical rows; within pending, newest created first.
     trips.sort(
@@ -233,11 +250,14 @@ def filter_trips(params: Mapping[str, Any]) -> dict[str, Any]:
         "page_obj": page_obj,
         "total_filtered_count": len(trips),
         "status_counts": status_counts,
+        "preset_counts": preset_counts,
         "filters": {
             "status": status,
             "vessel": vessel,
             "destination": destination,
             "half_empty": half_empty,
+            "anomaly": anomaly,
+            "weather": weather,
             "q": q,
         },
     }

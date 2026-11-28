@@ -5,12 +5,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from django.db.models import Q
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from apps.core.constants import DESTINATIONS
+from apps.core.constants import DESTINATIONS, WEATHER_STATES
 from apps.core.models import SafetyOverride, Trip, Vessel
 from apps.trips.forms import TripBookingForm
 from apps.trips.services import filter_trips, get_trips_kpis, get_vessels_meta
@@ -35,9 +36,11 @@ def _build_trips_context(
         "page_obj": ledger["page_obj"],
         "total_filtered_count": ledger["total_filtered_count"],
         "status_counts": ledger["status_counts"],
+        "preset_counts": ledger["preset_counts"],
         "filters": ledger["filters"],
         "vessels": list(Vessel.objects.order_by("vessel_id")),
         "destinations": list(DESTINATIONS),
+        "weather_states": list(WEATHER_STATES),
         "cancel_notice": cancel_notice,
     }
 
@@ -76,6 +79,37 @@ def ledger_partial(request: HttpRequest) -> HttpResponse:
     """HTMX partial endpoint returning the filtered and paginated trip ledger table."""
     context = _build_trips_context(filter_params=request.GET)
     return render(request, "trips/partials/trip_table.html", context)
+
+
+@require_GET
+def trip_inspector(request: HttpRequest, trip_id: str) -> HttpResponse:
+    """HTMX partial returning full physics fuel, capacity, and HSE telemetry for one trip."""
+    trip = get_object_or_404(
+        Trip.objects.select_related("vessel", "dispatch_plan", "consolidated_into"),
+        trip_id=trip_id,
+    )
+    active_overrides = list(
+        SafetyOverride.objects.filter(is_active=True)
+        .filter(Q(vessel=trip.vessel) | Q(destination=trip.destination))
+        .select_related("vessel")
+        .order_by("-created_at")
+    )
+    sibling_trips = list(
+        Trip.objects.select_related("vessel")
+        .filter(trip_date=trip.trip_date, destination=trip.destination)
+        .exclude(pk=trip.pk)
+        .exclude(status="cancelled")
+        .order_by("departure_dt")[:4]
+    )
+    return render(
+        request,
+        "trips/partials/trip_inspector.html",
+        {
+            "trip": trip,
+            "active_overrides": active_overrides,
+            "sibling_trips": sibling_trips,
+        },
+    )
 
 
 @require_POST

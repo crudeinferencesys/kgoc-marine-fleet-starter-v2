@@ -43,7 +43,15 @@
     </div>
     {% endif %}
 
-    <div class="pt-0.5">
+    <div class="pt-0.5 flex items-center justify-between gap-2">
+      <button type="button"
+              hx-get="{% url 'trips:inspect' created_trip.trip_id %}"
+              hx-target="#trip-inspector-body"
+              hx-swap="innerHTML"
+              @click="$dispatch('trip-inspector:open')"
+              class="text-xs font-semibold text-slate-700 hover:text-slate-900 underline decoration-slate-300">
+        Inspect Ticket
+      </button>
       <a href="{% url 'optimizer:index' %}" class="inline-flex items-center gap-1 text-xs font-semibold text-teal-800 hover:text-teal-950 underline decoration-teal-500/40">
         Open Optimizer
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -62,12 +70,19 @@
     hx-swap="outerHTML"
     hx-indicator="#booking-spinner"
     hx-disabled-elt="button[type='submit']"
-    class="space-y-3.5"
+    class="space-y-4"
     x-data="{
       vesselsMeta: {},
       vesselId: '',
-      passengers: 0,
-      cargoTonnes: 0,
+      destination: 'Platform A',
+      missionType: 'Passenger Transfer',
+      passengers: 5,
+      cargoTonnes: 0.1,
+      departureTime: '08:30',
+      weather: 'Calm',
+      priority: 'Routine',
+      flexibleWindow: true,
+      manualVesselOverride: false,
       init() {
         try {
           const el = document.getElementById('vessels-meta-data');
@@ -79,11 +94,90 @@
       },
       syncFromDom() {
         const vEl = this.$el.querySelector('[name=vessel]');
+        const dEl = this.$el.querySelector('[name=destination]');
+        const mEl = this.$el.querySelector('[name=mission_type]');
         const pEl = this.$el.querySelector('[name=passengers]');
         const cEl = this.$el.querySelector('[name=cargo_tonnes]');
+        const tEl = this.$el.querySelector('[name=departure_time]');
+        const wEl = this.$el.querySelector('[name=weather]');
+        const prEl = this.$el.querySelector('[name=priority]');
+        const fEl = this.$el.querySelector('[name=flexible_window]');
         this.vesselId = vEl ? String(vEl.value || '') : '';
+        this.destination = dEl ? String(dEl.value || '') : '';
+        this.missionType = mEl ? String(mEl.value || '') : '';
         this.passengers = pEl && pEl.value !== '' ? Number(pEl.value) : 0;
         this.cargoTonnes = cEl && cEl.value !== '' ? Number(cEl.value) : 0;
+        this.departureTime = tEl && tEl.value ? tEl.value : '08:30';
+        this.weather = wEl ? String(wEl.value || 'Calm') : 'Calm';
+        this.priority = prEl ? String(prEl.value || 'Routine') : 'Routine';
+        this.flexibleWindow = fEl ? Boolean(fEl.checked) : true;
+      },
+      pickDestination(val) {
+        const dEl = this.$el.querySelector('[name=destination]');
+        if (dEl) {
+          dEl.value = val;
+          this.destination = val;
+        }
+      },
+      pickMission(val) {
+        const mEl = this.$el.querySelector('[name=mission_type]');
+        if (mEl) {
+          mEl.value = val;
+          this.missionType = val;
+        }
+        if (!this.manualVesselOverride) {
+          const entries = Object.entries(this.vesselsMeta);
+          let match = null;
+          if (val === 'Material Delivery') {
+            match = entries.find(([, v]) => !v.is_standby_designated && v.vessel_type === 'Utility Boat');
+          } else if (val === 'Maintenance Support') {
+            match = entries.find(([, v]) => !v.is_standby_designated && v.vessel_type === 'Multi-purpose Boat')
+              || entries.find(([, v]) => !v.is_standby_designated && v.vessel_type === 'Crew Boat');
+          } else {
+            match = entries.find(([, v]) => !v.is_standby_designated && v.vessel_type === 'Crew Boat');
+          }
+          if (match) {
+            const vEl = this.$el.querySelector('[name=vessel]');
+            if (vEl) {
+              vEl.value = match[0];
+              this.vesselId = match[0];
+            }
+          }
+        }
+      },
+      setPax(val) {
+        const pEl = this.$el.querySelector('[name=passengers]');
+        if (pEl) {
+          pEl.value = val;
+          this.passengers = val;
+        }
+      },
+      setCargo(val) {
+        const cEl = this.$el.querySelector('[name=cargo_tonnes]');
+        if (cEl) {
+          cEl.value = val;
+          this.cargoTonnes = val;
+        }
+      },
+      skipOptionalAndSubmit() {
+        const tEl = this.$el.querySelector('[name=departure_time]');
+        const wEl = this.$el.querySelector('[name=weather]');
+        const prEl = this.$el.querySelector('[name=priority]');
+        const fEl = this.$el.querySelector('[name=flexible_window]');
+        const nEl = this.$el.querySelector('[name=notes]');
+        const det = this.$el.querySelector('#optional-trip-details');
+        if (tEl) tEl.value = '08:30';
+        if (wEl) wEl.value = 'Calm';
+        if (prEl) prEl.value = 'Routine';
+        if (fEl) fEl.checked = true;
+        if (nEl) nEl.value = '';
+        if (det) det.open = false;
+        this.syncFromDom();
+        if (typeof this.$el.requestSubmit === 'function') {
+          this.$el.requestSubmit();
+        } else {
+          this.$el.submit();
+        }
       },
       get selectedVessel() {
         return this.vesselId ? (this.vesselsMeta[this.vesselId] || null) : null;
@@ -109,6 +203,13 @@
       get isHalfEmpty() {
         return !this.isOverloaded && this.maxPct > 0 && this.maxPct < 50;
       },
+      get remainingDecisions() {
+        let missing = 0;
+        if (!this.destination) missing += 1;
+        if (!this.vesselId || !this.missionType) missing += 1;
+        if (this.passengers <= 0 && this.cargoTonnes <= 0) missing += 1;
+        return missing;
+      },
       get barColorClass() {
         if (this.isOverloaded || this.maxPct > 95) return 'bg-rose-600';
         if (this.maxPct >= 70) return 'bg-emerald-600';
@@ -125,6 +226,31 @@
     @change="syncFromDom()">
     {% csrf_token %}
 
+    <!-- 3-Decision Progressive Readiness Strip -->
+    <div class="rounded-xl bg-slate-50 border border-slate-200/80 p-3 space-y-2">
+      <div class="flex items-center justify-between gap-2 text-[11px]">
+        <span class="font-semibold text-slate-800"
+              x-text="isOverloaded ? 'Adjust vessel or payload' : (remainingDecisions === 0 ? '3/3 core decisions ready' : remainingDecisions + ' decision remaining')"></span>
+        <span class="font-mono tabular-nums font-semibold"
+              :class="isOverloaded ? 'text-rose-700' : (isHalfEmpty ? 'text-amber-700' : 'text-teal-700')"
+              x-text="maxPct.toFixed(0) + '% est. load'"></span>
+      </div>
+      <div class="grid grid-cols-3 gap-1.5 text-[10px] font-medium">
+        <div class="px-2 py-1 rounded-md text-center border"
+             :class="destination ? 'bg-teal-50 text-teal-800 border-teal-200' : 'bg-white text-slate-500 border-slate-200'">
+          1. Route
+        </div>
+        <div class="px-2 py-1 rounded-md text-center border"
+             :class="vesselId && missionType ? 'bg-teal-50 text-teal-800 border-teal-200' : 'bg-white text-slate-500 border-slate-200'">
+          2. Vessel
+        </div>
+        <div class="px-2 py-1 rounded-md text-center border"
+             :class="(passengers > 0 || cargoTonnes > 0) && !isOverloaded ? 'bg-teal-50 text-teal-800 border-teal-200' : 'bg-white text-slate-500 border-slate-200'">
+          3. Payload
+        </div>
+      </div>
+    </div>
+
     {% if form.non_field_errors %}
     <div class="rounded-xl border border-rose-200 bg-rose-50/90 border-l-4 border-l-rose-600 p-3 space-y-1 htmx-fade-in" role="alert">
       <div class="text-xs font-semibold uppercase tracking-wider text-rose-800">Booking Validation Error</div>
@@ -134,19 +260,62 @@
     </div>
     {% endif %}
 
-    <!-- Vessel & Destination -->
-    <div class="space-y-1">
-      <label for="{{ form.vessel.id_for_label }}" class="block text-xs font-semibold text-slate-700">
-        Assigned Vessel
-      </label>
-      {{ form.vessel }}
-      {% if form.vessel.errors %}
-      <p class="text-xs text-rose-700 font-medium">{{ form.vessel.errors|join:", " }}</p>
+    <!-- Decision 1: Destination Quick-Pick + Select -->
+    <div class="space-y-1.5">
+      <div class="flex items-center justify-between gap-2">
+        <label for="{{ form.destination.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+          1. Destination *
+        </label>
+        <span class="text-[11px] text-slate-500 font-mono" x-text="destination"></span>
+      </div>
+      <div class="flex flex-wrap gap-1">
+        {% for val, label in form.destination.field.choices %}
+        <button type="button"
+                @click="pickDestination('{{ val|escapejs }}')"
+                :class="destination === '{{ val|escapejs }}' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
+                class="px-2 py-1 rounded-md border text-[11px] font-medium transition-colors">
+          {{ label }}
+        </button>
+        {% endfor %}
+      </div>
+      {{ form.destination }}
+      {% if form.destination.errors %}
+      <p class="text-xs text-rose-700 font-medium">{{ form.destination.errors|join:", " }}</p>
       {% endif %}
     </div>
 
+    <!-- Decision 2: Mission & Vessel -->
+    <div class="space-y-2">
+      <div class="space-y-1.5">
+        <label for="{{ form.mission_type.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+          2. Mission &amp; Assigned Vessel *
+        </label>
+        <div class="grid grid-cols-3 gap-1">
+          {% for val, label in form.mission_type.field.choices %}
+          <button type="button"
+                  @click="pickMission('{{ val|escapejs }}')"
+                  :class="missionType === '{{ val|escapejs }}' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
+                  class="px-1.5 py-1 rounded-md border text-[10px] font-medium leading-tight text-center transition-colors">
+            {{ label }}
+          </button>
+          {% endfor %}
+        </div>
+        <div class="sr-only">
+          {{ form.mission_type }}
+        </div>
+      </div>
+
+      <div class="space-y-1" @change="if ($event.target.name === 'vessel') manualVesselOverride = true">
+        <label for="{{ form.vessel.id_for_label }}" class="sr-only">Assigned Vessel</label>
+        {{ form.vessel }}
+        {% if form.vessel.errors %}
+        <p class="text-xs text-rose-700 font-medium">{{ form.vessel.errors|join:", " }}</p>
+        {% endif %}
+      </div>
+    </div>
+
     <!-- Alpine Live Capacity & HSE Preview -->
-    <div x-show="selectedVessel" x-cloak class="rounded-xl border border-slate-200 bg-slate-50/80 p-3 space-y-2.5">
+    <div x-show="selectedVessel" x-cloak class="rounded-xl border border-slate-200 bg-slate-50/80 p-3 space-y-2">
       <div class="flex items-center justify-between gap-2">
         <div>
           <span class="font-mono font-semibold text-xs text-slate-900" x-text="selectedVessel ? selectedVessel.vessel_id : ''"></span>
@@ -168,16 +337,14 @@
         <span x-text="selectedVessel ? (cargoTonnes + '/' + selectedVessel.cargo_capacity_t + ' t') : ''"></span>
       </div>
 
-      <!-- Instant Half-Empty Warning -->
       <div x-show="isHalfEmpty" x-cloak class="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium text-amber-900 flex items-center gap-1.5">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-amber-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
           <path d="M12 9v4" /><path d="M12 17h.01" />
         </svg>
-        <span>Half-Empty (&lt;50%) — will be flagged for consolidation</span>
+        <span>Half-Empty (&lt;50%) — optimizer merge candidate</span>
       </div>
 
-      <!-- Instant Overload Warning -->
       <div x-show="isOverloaded" x-cloak class="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-800 flex items-center gap-1.5">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-rose-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" />
@@ -185,7 +352,6 @@
         <span>Exceeds vessel limit — select a larger vessel</span>
       </div>
 
-      <!-- Instant Active HSE Override Alert -->
       <div x-show="activeOverrides.length > 0" x-cloak class="rounded-lg border border-rose-200 bg-rose-50/95 border-l-4 border-l-rose-600 p-2.5 space-y-1">
         <div class="text-[10px] font-semibold uppercase tracking-wider text-rose-800">
           Active HSE Override
@@ -199,108 +365,124 @@
       </div>
     </div>
 
-    <div class="space-y-1">
-      <label for="{{ form.destination.id_for_label }}" class="block text-xs font-semibold text-slate-700">
-        Destination
-      </label>
-      {{ form.destination }}
-      {% if form.destination.errors %}
-      <p class="text-xs text-rose-700 font-medium">{{ form.destination.errors|join:", " }}</p>
-      {% endif %}
-    </div>
+    <!-- Decision 3: Payload with Quick Steppers -->
+    <div class="space-y-2">
+      <div class="text-xs font-semibold text-slate-700">3. Payload *</div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-1">
+          <label for="{{ form.passengers.id_for_label }}" class="block text-[11px] font-medium text-slate-600">
+            Passengers
+          </label>
+          {{ form.passengers }}
+          <div class="flex gap-1 pt-0.5">
+            <button type="button" @click="setPax(4)" class="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[10px] font-mono text-slate-700">4</button>
+            <button type="button" @click="setPax(10)" class="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[10px] font-mono text-slate-700">10</button>
+            <button type="button" @click="setPax(16)" class="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[10px] font-mono text-slate-700">16</button>
+          </div>
+          {% if form.passengers.errors %}
+          <p class="text-xs text-rose-700 font-medium">{{ form.passengers.errors|join:", " }}</p>
+          {% endif %}
+        </div>
 
-    <div class="space-y-1">
-      <label for="{{ form.mission_type.id_for_label }}" class="block text-xs font-semibold text-slate-700">
-        Mission Type
-      </label>
-      {{ form.mission_type }}
-      {% if form.mission_type.errors %}
-      <p class="text-xs text-rose-700 font-medium">{{ form.mission_type.errors|join:", " }}</p>
-      {% endif %}
-    </div>
-
-    <div class="grid grid-cols-2 gap-3">
-      <div class="space-y-1">
-        <label for="{{ form.departure_time.id_for_label }}" class="block text-xs font-semibold text-slate-700">
-          Departure
-        </label>
-        {{ form.departure_time }}
-        {% if form.departure_time.errors %}
-        <p class="text-xs text-rose-700 font-medium">{{ form.departure_time.errors|join:", " }}</p>
-        {% endif %}
-      </div>
-
-      <div class="space-y-1">
-        <label for="{{ form.weather.id_for_label }}" class="block text-xs font-semibold text-slate-700">
-          Sea Weather
-        </label>
-        {{ form.weather }}
-        {% if form.weather.errors %}
-        <p class="text-xs text-rose-700 font-medium">{{ form.weather.errors|join:", " }}</p>
-        {% endif %}
+        <div class="space-y-1">
+          <label for="{{ form.cargo_tonnes.id_for_label }}" class="block text-[11px] font-medium text-slate-600">
+            Cargo (t)
+          </label>
+          {{ form.cargo_tonnes }}
+          <div class="flex gap-1 pt-0.5">
+            <button type="button" @click="setCargo(0.1)" class="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[10px] font-mono text-slate-700">0.1t</button>
+            <button type="button" @click="setCargo(2.5)" class="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[10px] font-mono text-slate-700">2.5t</button>
+            <button type="button" @click="setCargo(5.0)" class="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[10px] font-mono text-slate-700">5.0t</button>
+          </div>
+          {% if form.cargo_tonnes.errors %}
+          <p class="text-xs text-rose-700 font-medium">{{ form.cargo_tonnes.errors|join:", " }}</p>
+          {% endif %}
+        </div>
       </div>
     </div>
 
-    <div class="grid grid-cols-2 gap-3">
-      <div class="space-y-1">
-        <label for="{{ form.passengers.id_for_label }}" class="block text-xs font-semibold text-slate-700">
-          Passengers
-        </label>
-        {{ form.passengers }}
-        {% if form.passengers.errors %}
-        <p class="text-xs text-rose-700 font-medium">{{ form.passengers.errors|join:", " }}</p>
-        {% endif %}
+    <!-- Progressive Disclosure: Optional Timing, Weather, Priority & Notes -->
+    <details id="optional-trip-details"
+             class="rounded-xl border border-slate-200/90 bg-slate-50/70 p-3"
+             {% if form.departure_time.errors or form.weather.errors or form.priority.errors or form.notes.errors %}open{% endif %}>
+      <summary class="cursor-pointer select-none list-none flex items-center justify-between gap-2 text-xs font-medium text-slate-700">
+        <span>+ Optional timing &amp; conditions</span>
+        <span class="font-mono tabular-nums text-[10px] text-slate-500"
+              x-text="departureTime + ' · ' + weather + ' · ' + priority"></span>
+      </summary>
+
+      <div class="mt-3 pt-3 border-t border-slate-200/70 space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1">
+            <label for="{{ form.departure_time.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+              Departure
+            </label>
+            {{ form.departure_time }}
+            {% if form.departure_time.errors %}
+            <p class="text-xs text-rose-700 font-medium">{{ form.departure_time.errors|join:", " }}</p>
+            {% endif %}
+          </div>
+
+          <div class="space-y-1">
+            <label for="{{ form.weather.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+              Sea Weather
+            </label>
+            {{ form.weather }}
+            {% if form.weather.errors %}
+            <p class="text-xs text-rose-700 font-medium">{{ form.weather.errors|join:", " }}</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <label for="{{ form.priority.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+            Priority
+          </label>
+          {{ form.priority }}
+          {% if form.priority.errors %}
+          <p class="text-xs text-rose-700 font-medium">{{ form.priority.errors|join:", " }}</p>
+          {% endif %}
+        </div>
+
+        <div class="flex items-center gap-2.5">
+          {{ form.flexible_window }}
+          <label for="{{ form.flexible_window.id_for_label }}" class="text-xs font-medium text-slate-700 cursor-pointer select-none">
+            Flexible window (-30m / +60m for optimizer)
+          </label>
+        </div>
+
+        <div class="space-y-1">
+          <label for="{{ form.notes.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+            Operational Notes
+          </label>
+          {{ form.notes }}
+          {% if form.notes.errors %}
+          <p class="text-xs text-rose-700 font-medium">{{ form.notes.errors|join:", " }}</p>
+          {% endif %}
+        </div>
       </div>
+    </details>
 
-      <div class="space-y-1">
-        <label for="{{ form.cargo_tonnes.id_for_label }}" class="block text-xs font-semibold text-slate-700">
-          Cargo (t)
-        </label>
-        {{ form.cargo_tonnes }}
-        {% if form.cargo_tonnes.errors %}
-        <p class="text-xs text-rose-700 font-medium">{{ form.cargo_tonnes.errors|join:", " }}</p>
-        {% endif %}
-      </div>
+    <!-- Primary Submit + Skip Optional Exit Hatch -->
+    <div class="space-y-2 pt-1">
+      <button type="submit" class="btn btn-primary btn-sm w-full gap-2">
+        <span class="htmx-hide-on-request inline-flex items-center gap-1.5">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12h14" /><path d="M12 5v14" />
+          </svg>
+          Log Shift Trip Request
+        </span>
+        <span id="booking-spinner" class="htmx-indicator items-center gap-2">
+          <span class="loading loading-spinner loading-xs"></span>
+          Logging shift request…
+        </span>
+      </button>
+
+      <button type="button"
+              @click="skipOptionalAndSubmit()"
+              class="btn btn-ghost btn-xs w-full text-slate-500 hover:text-slate-800 font-medium">
+        Skip optional &amp; submit with defaults
+      </button>
     </div>
-
-    <div class="space-y-1">
-      <label for="{{ form.priority.id_for_label }}" class="block text-xs font-semibold text-slate-700">
-        Priority
-      </label>
-      {{ form.priority }}
-      {% if form.priority.errors %}
-      <p class="text-xs text-rose-700 font-medium">{{ form.priority.errors|join:", " }}</p>
-      {% endif %}
-    </div>
-
-    <div class="flex items-center gap-2.5 pt-0.5">
-      {{ form.flexible_window }}
-      <label for="{{ form.flexible_window.id_for_label }}" class="text-xs font-medium text-slate-700 cursor-pointer select-none">
-        Flexible departure window (-30m / +60m for optimizer)
-      </label>
-    </div>
-
-    <div class="space-y-1">
-      <label for="{{ form.notes.id_for_label }}" class="block text-xs font-semibold text-slate-700">
-        Operational Notes
-      </label>
-      {{ form.notes }}
-      {% if form.notes.errors %}
-      <p class="text-xs text-rose-700 font-medium">{{ form.notes.errors|join:", " }}</p>
-      {% endif %}
-    </div>
-
-    <button type="submit" class="btn btn-primary btn-sm w-full gap-2">
-      <span class="htmx-hide-on-request inline-flex items-center gap-1.5">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M5 12h14" /><path d="M12 5v14" />
-        </svg>
-        Log Shift Trip Request
-      </span>
-      <span id="booking-spinner" class="htmx-indicator items-center gap-2">
-        <span class="loading loading-spinner loading-xs"></span>
-        Logging shift request…
-      </span>
-    </button>
   </form>
 </div>

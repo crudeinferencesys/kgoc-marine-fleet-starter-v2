@@ -10,48 +10,78 @@
   </div>
   {% endif %}
 
-  <!-- Ledger Header & Quick Status Tabs -->
-  <div class="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-    <div>
-      <h2 class="text-base font-semibold text-slate-900">Fleet Trip Ledger</h2>
-      <p class="text-xs text-slate-500">Live pending shift requests ordered first, followed by historical KJO sailings</p>
+  <!-- Ledger Header & DIM-Style Saved Preset Filter Chips -->
+  <div class="px-5 py-4 border-b border-slate-100 space-y-3">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <div>
+        <h2 class="text-base font-semibold text-slate-900">Fleet Trip Ledger</h2>
+        <p class="text-xs text-slate-500">One-click operational presets + live search across pending queue and 976 historical KJO sailings</p>
+      </div>
+      <span class="font-mono tabular-nums text-xs text-slate-500 shrink-0">
+        {{ total_filtered_count }} matched
+      </span>
     </div>
 
-    <div class="inline-flex flex-wrap items-center gap-1 rounded-lg bg-slate-100 p-1 self-start sm:self-auto">
-      <button
-        type="button"
-        hx-get="{% url 'trips:ledger' %}?status=all&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&q={{ filters.q|urlencode }}"
-        hx-target="#trips-ledger-panel"
-        hx-swap="outerHTML"
-        class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors {% if filters.status == 'all' or not filters.status %}bg-white text-slate-900 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">
-        All <span class="font-mono tabular-nums text-[11px] text-slate-500 ml-0.5">{{ status_counts.all }}</span>
+    <!-- DIM-Style Preset Chips -->
+    <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Quick trip discovery presets">
+      <button type="button"
+              hx-get="{% url 'trips:ledger' %}?status=all"
+              hx-target="#trips-ledger-panel"
+              hx-swap="outerHTML"
+              class="btn btn-xs rounded-full border {% if filters.status == 'all' and not filters.half_empty and not filters.anomaly and not filters.weather and not filters.vessel and not filters.destination and not filters.q %}bg-slate-900 text-white border-slate-900{% else %}bg-white text-slate-700 border-slate-200 hover:bg-slate-50{% endif %}">
+        All <span class="font-mono tabular-nums opacity-80">{{ preset_counts.all }}</span>
       </button>
-      <button
-        type="button"
-        hx-get="{% url 'trips:ledger' %}?status=pending&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&q={{ filters.q|urlencode }}"
-        hx-target="#trips-ledger-panel"
-        hx-swap="outerHTML"
-        class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors {% if filters.status == 'pending' %}bg-white text-amber-800 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">
-        Pending Queue <span class="font-mono tabular-nums text-[11px] text-amber-700 ml-0.5">{{ status_counts.pending }}</span>
+
+      <button type="button"
+              hx-get="{% url 'trips:ledger' %}?status=pending"
+              hx-target="#trips-ledger-panel"
+              hx-swap="outerHTML"
+              class="btn btn-xs rounded-full border {% if filters.status == 'pending' and not filters.half_empty and not filters.anomaly and not filters.weather %}bg-teal-600 text-white border-teal-600{% else %}bg-teal-50/70 text-teal-900 border-teal-200 hover:bg-teal-100/70{% endif %}">
+        Pending Queue <span class="font-mono tabular-nums">{{ preset_counts.pending }}</span>
       </button>
-      <button
-        type="button"
-        hx-get="{% url 'trips:ledger' %}?status=completed&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&q={{ filters.q|urlencode }}"
-        hx-target="#trips-ledger-panel"
-        hx-swap="outerHTML"
-        class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors {% if filters.status == 'completed' %}bg-white text-slate-900 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">
-        Historical <span class="font-mono tabular-nums text-[11px] text-slate-500 ml-0.5">{{ status_counts.completed }}</span>
+
+      <button type="button"
+              hx-get="{% url 'trips:ledger' %}?status=all&half_empty=1"
+              hx-target="#trips-ledger-panel"
+              hx-swap="outerHTML"
+              class="btn btn-xs rounded-full border {% if filters.half_empty == '1' and not filters.anomaly and not filters.weather %}bg-amber-600 text-white border-amber-600{% else %}bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100/80{% endif %}">
+        Half-Empty &lt;50% <span class="font-mono tabular-nums">{{ preset_counts.half_empty }}</span>
+      </button>
+
+      <button type="button"
+              hx-get="{% url 'trips:ledger' %}?status=all&anomaly=high"
+              hx-target="#trips-ledger-panel"
+              hx-swap="outerHTML"
+              class="btn btn-xs rounded-full border {% if filters.anomaly == 'high' %}bg-rose-600 text-white border-rose-600{% else %}bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100/80{% endif %}">
+        Fuel Outliers ≥1.3× <span class="font-mono tabular-nums">{{ preset_counts.outliers }}</span>
+      </button>
+
+      <button type="button"
+              hx-get="{% url 'trips:ledger' %}?status=all&anomaly=missing"
+              hx-target="#trips-ledger-panel"
+              hx-swap="outerHTML"
+              class="btn btn-xs rounded-full border {% if filters.anomaly == 'missing' %}bg-slate-800 text-white border-slate-800{% else %}bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200/70{% endif %}">
+        Missing Logs <span class="font-mono tabular-nums">{{ preset_counts.missing_fuel }}</span>
+      </button>
+
+      <button type="button"
+              hx-get="{% url 'trips:ledger' %}?status=all&weather=Rough"
+              hx-target="#trips-ledger-panel"
+              hx-swap="outerHTML"
+              class="btn btn-xs rounded-full border {% if filters.weather == 'Rough' %}bg-rose-700 text-white border-rose-700{% else %}bg-white text-slate-700 border-slate-200 hover:bg-slate-50{% endif %}">
+        Rough Weather <span class="font-mono tabular-nums">{{ preset_counts.rough_weather }}</span>
       </button>
     </div>
   </div>
 
-  <!-- Live HTMX Filter Bar -->
+  <!-- Live HTMX Faceted Filter Bar -->
   <form
     hx-get="{% url 'trips:ledger' %}"
     hx-target="#trips-ledger-panel"
     hx-swap="outerHTML"
     hx-trigger="change, submit, keyup changed delay:300ms from:input[name='q']"
-    class="px-5 py-3 bg-slate-50/70 border-b border-slate-100 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-2.5 items-center">
+    class="px-5 py-3 bg-slate-50/70 border-b border-slate-100 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-2 items-center">
+    <input type="hidden" name="anomaly" value="{{ filters.anomaly }}" />
     <div class="xl:col-span-2">
       <label for="ledger-filter-status" class="sr-only">Filter by status</label>
       <select id="ledger-filter-status" name="status" class="select select-bordered select-xs w-full bg-white text-xs">
@@ -73,12 +103,22 @@
       </select>
     </div>
 
-    <div class="xl:col-span-3">
+    <div class="xl:col-span-2">
       <label for="ledger-filter-destination" class="sr-only">Filter by destination</label>
       <select id="ledger-filter-destination" name="destination" class="select select-bordered select-xs w-full bg-white text-xs">
         <option value="">All Destinations</option>
         {% for dest in destinations %}
         <option value="{{ dest }}" {% if filters.destination == dest %}selected{% endif %}>{{ dest }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="xl:col-span-2">
+      <label for="ledger-filter-weather" class="sr-only">Filter by weather</label>
+      <select id="ledger-filter-weather" name="weather" class="select select-bordered select-xs w-full bg-white text-xs">
+        <option value="">All Sea States</option>
+        {% for w in weather_states %}
+        <option value="{{ w }}" {% if filters.weather == w %}selected{% endif %}>{{ w }}</option>
         {% endfor %}
       </select>
     </div>
@@ -94,8 +134,8 @@
         class="input input-bordered input-xs w-full bg-white text-xs" />
     </div>
 
-    <div class="xl:col-span-2 flex items-center justify-between gap-2">
-      <label for="ledger-filter-half-empty" class="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-slate-700 select-none">
+    <div class="xl:col-span-1 flex items-center justify-end gap-2">
+      <label for="ledger-filter-half-empty" class="flex items-center gap-1 cursor-pointer text-xs font-medium text-slate-700 select-none whitespace-nowrap">
         <input
           id="ledger-filter-half-empty"
           type="checkbox"
@@ -105,18 +145,93 @@
           {% if filters.half_empty == '1' %}checked{% endif %} />
         <span>&lt;50%</span>
       </label>
-      {% if filters.vessel or filters.destination or filters.half_empty == '1' or filters.q or filters.status and filters.status != 'all' %}
-      <button
-        type="button"
-        hx-get="{% url 'trips:ledger' %}"
-        hx-target="#trips-ledger-panel"
-        hx-swap="outerHTML"
-        class="text-[11px] font-medium text-teal-700 hover:text-teal-900 underline">
-        Reset
-      </button>
-      {% endif %}
     </div>
   </form>
+
+  <!-- Active Removable Filter Chips Bar (Frictionless Exit) -->
+  {% if filters.vessel or filters.destination or filters.half_empty == '1' or filters.anomaly or filters.weather or filters.q or filters.status and filters.status != 'all' %}
+  <div class="px-5 py-2.5 bg-slate-50 border-b border-slate-100 flex flex-wrap items-center gap-1.5 text-[11px]">
+    <span class="font-semibold uppercase tracking-wider text-slate-400 mr-1 text-[10px]">Active:</span>
+
+    {% if filters.status and filters.status != 'all' %}
+    <button type="button"
+            hx-get="{% url 'trips:ledger' %}?status=all&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&anomaly={{ filters.anomaly|urlencode }}&weather={{ filters.weather|urlencode }}&q={{ filters.q|urlencode }}"
+            hx-target="#trips-ledger-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-rose-300">
+      <span>Status: {{ filters.status }}</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    {% if filters.vessel %}
+    <button type="button"
+            hx-get="{% url 'trips:ledger' %}?status={{ filters.status|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&anomaly={{ filters.anomaly|urlencode }}&weather={{ filters.weather|urlencode }}&q={{ filters.q|urlencode }}"
+            hx-target="#trips-ledger-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-rose-300">
+      <span>Vessel: {{ filters.vessel }}</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    {% if filters.destination %}
+    <button type="button"
+            hx-get="{% url 'trips:ledger' %}?status={{ filters.status|urlencode }}&vessel={{ filters.vessel|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&anomaly={{ filters.anomaly|urlencode }}&weather={{ filters.weather|urlencode }}&q={{ filters.q|urlencode }}"
+            hx-target="#trips-ledger-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-rose-300">
+      <span>Dest: {{ filters.destination }}</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    {% if filters.half_empty == '1' %}
+    <button type="button"
+            hx-get="{% url 'trips:ledger' %}?status={{ filters.status|urlencode }}&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&anomaly={{ filters.anomaly|urlencode }}&weather={{ filters.weather|urlencode }}&q={{ filters.q|urlencode }}"
+            hx-target="#trips-ledger-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-900 hover:border-rose-300">
+      <span>&lt;50% Half-Empty</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    {% if filters.anomaly %}
+    <button type="button"
+            hx-get="{% url 'trips:ledger' %}?status={{ filters.status|urlencode }}&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&weather={{ filters.weather|urlencode }}&q={{ filters.q|urlencode }}"
+            hx-target="#trips-ledger-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-800 hover:border-rose-400">
+      <span>Fuel: {{ filters.anomaly }}</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    {% if filters.weather %}
+    <button type="button"
+            hx-get="{% url 'trips:ledger' %}?status={{ filters.status|urlencode }}&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&anomaly={{ filters.anomaly|urlencode }}&q={{ filters.q|urlencode }}"
+            hx-target="#trips-ledger-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-rose-300">
+      <span>Weather: {{ filters.weather }}</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    {% if filters.q %}
+    <button type="button"
+            hx-get="{% url 'trips:ledger' %}?status={{ filters.status|urlencode }}&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&anomaly={{ filters.anomaly|urlencode }}&weather={{ filters.weather|urlencode }}"
+            hx-target="#trips-ledger-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-rose-300">
+      <span>Query: "{{ filters.q }}"</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    <button type="button"
+            hx-get="{% url 'trips:ledger' %}"
+            hx-target="#trips-ledger-panel"
+            hx-swap="outerHTML"
+            class="ml-auto font-semibold text-teal-700 hover:text-teal-900 underline">
+      Clear All
+    </button>
+  </div>
+  {% endif %}
 
   <!-- Responsive Data Table -->
   <div class="overflow-x-auto">
@@ -132,9 +247,16 @@
       </thead>
       <tbody class="divide-y divide-slate-100 text-sm">
         {% for trip in page_obj %}
-        <tr class="hover:bg-slate-50/70 transition-colors">
+        <tr class="hover:bg-slate-50/80 transition-colors">
           <td class="align-top py-3">
-            <div class="font-mono tabular-nums text-xs font-semibold text-slate-900">{{ trip.trip_id }}</div>
+            <button type="button"
+                    hx-get="{% url 'trips:inspect' trip.trip_id %}"
+                    hx-target="#trip-inspector-body"
+                    hx-swap="innerHTML"
+                    @click="$dispatch('trip-inspector:open')"
+                    class="font-mono tabular-nums text-xs font-semibold text-teal-700 hover:text-teal-900 underline decoration-teal-500/40 text-left">
+              {{ trip.trip_id }}
+            </button>
             {% if trip.request_id %}
             <div class="font-mono tabular-nums text-[11px] text-slate-500">{{ trip.request_id }}</div>
             {% endif %}
@@ -181,11 +303,33 @@
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium {% if trip.priority == 'Critical' %}bg-rose-50 text-rose-800 border border-rose-200{% elif trip.priority == 'Urgent' %}bg-amber-50 text-amber-900 border border-amber-200{% else %}bg-slate-100 text-slate-600 border border-slate-200{% endif %}">
                 {{ trip.priority }}
               </span>
+              {% if trip.fuel_anomaly_status == 'high' %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono tabular-nums font-semibold bg-rose-50 text-rose-800 border border-rose-200">
+                {{ trip.fuel_ratio|floatformat:2 }}× Fuel
+              </span>
+              {% elif trip.fuel_anomaly_status == 'low' %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono tabular-nums font-medium bg-amber-50 text-amber-900 border border-amber-200">
+                {{ trip.fuel_ratio|floatformat:2 }}× Low
+              </span>
+              {% elif trip.status == 'completed' and trip.fuel_anomaly_status == 'missing' %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                No Fuel Log
+              </span>
+              {% endif %}
             </div>
           </td>
 
           <td class="align-top py-3 text-right">
             <div class="flex items-center justify-end gap-1.5">
+              <button type="button"
+                      hx-get="{% url 'trips:inspect' trip.trip_id %}"
+                      hx-target="#trip-inspector-body"
+                      hx-swap="innerHTML"
+                      @click="$dispatch('trip-inspector:open')"
+                      class="btn btn-ghost btn-xs text-slate-600 hover:text-slate-900 border border-slate-200 font-medium">
+                Inspect
+              </button>
+
               {% if trip.status == 'pending' %}
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-900 border border-amber-200">
                 Pending
@@ -226,7 +370,7 @@
         <tr>
           <td colspan="5" class="py-10 text-center">
             <p class="text-sm font-medium text-slate-700">No trips match the current filters.</p>
-            <p class="text-xs text-slate-500 mt-1">Adjust your search criteria or reset filters to view the full fleet ledger.</p>
+            <p class="text-xs text-slate-500 mt-1">Adjust your search criteria or click Clear All to view the full fleet ledger.</p>
           </td>
         </tr>
         {% endfor %}
@@ -250,7 +394,7 @@
       <button
         type="button"
         class="btn btn-outline btn-xs border-slate-300 text-slate-700 bg-white hover:bg-slate-100"
-        hx-get="{% url 'trips:ledger' %}?page={{ page_obj.previous_page_number }}&status={{ filters.status|urlencode }}&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&q={{ filters.q|urlencode }}"
+        hx-get="{% url 'trips:ledger' %}?page={{ page_obj.previous_page_number }}&status={{ filters.status|urlencode }}&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&anomaly={{ filters.anomaly|urlencode }}&weather={{ filters.weather|urlencode }}&q={{ filters.q|urlencode }}"
         hx-target="#trips-ledger-panel"
         hx-swap="outerHTML">
         Previous
@@ -267,7 +411,7 @@
       <button
         type="button"
         class="btn btn-outline btn-xs border-slate-300 text-slate-700 bg-white hover:bg-slate-100"
-        hx-get="{% url 'trips:ledger' %}?page={{ page_obj.next_page_number }}&status={{ filters.status|urlencode }}&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&q={{ filters.q|urlencode }}"
+        hx-get="{% url 'trips:ledger' %}?page={{ page_obj.next_page_number }}&status={{ filters.status|urlencode }}&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&anomaly={{ filters.anomaly|urlencode }}&weather={{ filters.weather|urlencode }}&q={{ filters.q|urlencode }}"
         hx-target="#trips-ledger-panel"
         hx-swap="outerHTML">
         Next
