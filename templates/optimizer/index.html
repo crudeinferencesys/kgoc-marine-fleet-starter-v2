@@ -4,14 +4,7 @@
 
 {% block topbar_title %}Dispatch Optimizer{% endblock %}
 
-{% block topbar_actions %}
-<a href="{% url 'core:copilot:index' %}" class="btn btn-xs bg-indigo-600 hover:bg-indigo-500 text-white border-0 gap-1 font-semibold">
-  AI Co-Pilot
-  <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
-  </svg>
-</a>
-{% endblock %}
+{% block topbar_actions %}{% endblock %}
 
 {% block content %}
 {% include "optimizer/partials/workspace.html" %}

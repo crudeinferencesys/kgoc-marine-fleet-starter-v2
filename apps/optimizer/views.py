@@ -36,6 +36,39 @@ def _build_workspace_context(
         allow_milk_run=allow_milk_run,
     )
     saved_plans = result["saved_plans"]
+    raw_backtest = result["backtest"]
+    raw_corridors = raw_backtest.get("corridors", [])
+    max_merge_fuel = max(
+        (float(row.get("merge_fuel_l") or 0.0) for row in raw_corridors),
+        default=0.0,
+    )
+    backtest = {
+        **raw_backtest,
+        "corridors": [
+            {
+                **row,
+                "fuel_bar_pct": (
+                    min(
+                        100,
+                        max(
+                            0,
+                            round(
+                                (float(row.get("merge_fuel_l") or 0.0) / max_merge_fuel)
+                                * 100
+                            ),
+                        ),
+                    )
+                    if max_merge_fuel > 0
+                    else 0
+                ),
+            }
+            for row in raw_corridors
+        ],
+    }
+    held_trips = result["held_trips"]
+    held_hse_count = sum(1 for h in held_trips if h["badge_tone"] == "rose")
+    default_plan_name = f"Shift Plan · {timezone.localtime().strftime('%b %d %H:%M')}"
+
     return {
         "strict_weather": strict_weather,
         "allow_milk_run": allow_milk_run,
@@ -47,12 +80,14 @@ def _build_workspace_context(
         "active_overrides": result["active_overrides"],
         "active_overrides_count": len(result["active_overrides"]),
         "proposed_merges": result["proposed_merges"],
-        "held_trips": result["held_trips"],
+        "held_trips": held_trips,
+        "held_hse_count": held_hse_count,
+        "default_plan_name": default_plan_name,
         "summary": result["summary"],
         "saved_plans": saved_plans,
         "saved_plans_count": len(saved_plans),
         "approved_plans_count": sum(1 for p in saved_plans if p.is_approved),
-        "backtest": result["backtest"],
+        "backtest": backtest,
     }
 
 

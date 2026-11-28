@@ -2,6 +2,14 @@
      class="htmx-fade-in"
      x-data="{
        activeTab: '{{ active_tab|default:"solver"|escapejs }}',
+       rightTab: 'held',
+       heldFilter: 'all',
+       heldTotal: {{ held_trips|length }},
+       heldHse: {{ held_hse_count|default:0 }},
+       inspectorOpen: false,
+       expandedPlanId: null,
+       confirmRevertId: null,
+       allMergeIds: [{% for m in proposed_merges %}'{{ m.merge_id|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}],
        selectedIds: [{% for m in proposed_merges %}{% if m.checked_default %}'{{ m.merge_id|escapejs }}'{% if not forloop.last %},{% endif %}{% endif %}{% endfor %}],
        mergeMetrics: {
          {% for m in proposed_merges %}
@@ -15,6 +23,15 @@
        },
        get selectedCount() {
          return this.selectedIds.length;
+       },
+       get allSelected() {
+         return this.allMergeIds.length > 0 && this.selectedIds.length === this.allMergeIds.length;
+       },
+       toggleSelectAll() {
+         this.selectedIds = this.allSelected ? [] : [...this.allMergeIds];
+       },
+       get heldOtherCount() {
+         return Math.max(0, this.heldTotal - this.heldHse);
        },
        get selectedFuel() {
          return this.selectedIds.reduce((sum, id) => sum + (this.mergeMetrics[id]?.fuel || 0), 0);
@@ -34,7 +51,9 @@
        fmtDec(n) {
          return Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
        }
-     }">
+     }"
+     @trip-inspector:close.window="inspectorOpen = false"
+     @keydown.escape.window="inspectorOpen = false">
 
   <!-- Band 1: Slim Operational Toolbar -->
   <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 mb-2.5">
@@ -66,7 +85,7 @@
       </button>
     </div>
 
-    <!-- Solver Policy Toggles + Run Solver CTA -->
+    <!-- Auto-Solving Policy Toggles + Run Solver CTA -->
     <form method="post" action="{% url 'optimizer:solve' %}" class="flex flex-wrap items-center gap-1.5 shrink-0">
       {% csrf_token %}
       <input type="hidden" name="strict_weather" value="0" />
@@ -77,6 +96,12 @@
                name="strict_weather"
                value="1"
                {% if strict_weather %}checked{% endif %}
+               hx-post="{% url 'optimizer:solve' %}"
+               hx-trigger="change"
+               hx-include="closest form"
+               hx-target="#optimizer-workspace"
+               hx-swap="outerHTML"
+               hx-indicator="#solve-spinner"
                class="toggle toggle-xs toggle-primary" />
         <span>HSE Strict Weather</span>
       </label>
@@ -89,6 +114,12 @@
                name="allow_milk_run"
                value="1"
                {% if allow_milk_run %}checked{% endif %}
+               hx-post="{% url 'optimizer:solve' %}"
+               hx-trigger="change"
+               hx-include="closest form"
+               hx-target="#optimizer-workspace"
+               hx-swap="outerHTML"
+               hx-indicator="#solve-spinner"
                class="toggle toggle-xs toggle-primary" />
         <span>Milk-Run</span>
       </label>
@@ -139,8 +170,12 @@
   </div>
   {% endif %}
 
-  <!-- Band 2: Compact 4-KPI Impact Ribbon -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-2.5" data-scroll-section data-scroll-label="Impact KPIs">
+  <!-- Band 2: Compact 4-KPI Impact Ribbon (Solver Tab Only) -->
+  <div x-show="activeTab === 'solver'"
+       {% if active_tab != 'solver' %}style="display: none;"{% endif %}
+       class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-2.5"
+       data-scroll-section
+       data-scroll-label="Impact KPIs">
     <!-- KPI 1: Trips Eliminated -->
     <div class="surface-card kpi-accent-teal p-3">
       <div class="flex items-center justify-between gap-2">
@@ -153,10 +188,10 @@
       </div>
       <div class="mt-1 flex items-baseline gap-1.5">
         <span class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-slate-900"
-              x-text="activeTab === 'solver' ? selectedCount : {{ summary.trips_eliminated }}">{{ summary.trips_eliminated }}</span>
+              x-text="selectedCount">{{ summary.trips_eliminated }}</span>
         <span class="text-xs font-semibold text-slate-500">trips</span>
         <span class="ml-auto text-[11px] text-slate-500 font-mono tabular-nums"
-              x-text="activeTab === 'solver' ? ({{ summary.baseline_trips }} + ' -> ' + ({{ summary.baseline_trips }} - selectedCount) + ' runs') : '{{ summary.baseline_trips }} -> {{ summary.optimized_trips }} runs'">{{ summary.baseline_trips }} -> {{ summary.optimized_trips }} runs</span>
+              x-text="{{ summary.baseline_trips }} + ' \u2192 ' + ({{ summary.baseline_trips }} - selectedCount) + ' runs'">{{ summary.baseline_trips }} → {{ summary.optimized_trips }} runs</span>
       </div>
     </div>
 
@@ -172,7 +207,7 @@
       </div>
       <div class="mt-1 flex items-baseline gap-1.5">
         <span class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-emerald-700"
-              x-text="activeTab === 'solver' ? fmtDec(selectedFuel) : '{{ summary.fuel_liters_saved|floatformat:1 }}'">{{ summary.fuel_liters_saved|floatformat:1 }}</span>
+              x-text="fmtDec(selectedFuel)">{{ summary.fuel_liters_saved|floatformat:1 }}</span>
         <span class="text-xs font-semibold text-slate-500">L</span>
         <span class="ml-auto text-[11px] text-slate-500 font-mono tabular-nums">{{ eligible_vessels|length }} vessels ready</span>
       </div>
@@ -190,7 +225,7 @@
       </div>
       <div class="mt-1 flex items-baseline gap-1.5">
         <span class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-emerald-700"
-              x-text="activeTab === 'solver' ? fmtInt(selectedKwd) : '{{ summary.kwd_saved|floatformat:0 }}'">{{ summary.kwd_saved|floatformat:0 }}</span>
+              x-text="fmtInt(selectedKwd)">{{ summary.kwd_saved|floatformat:0 }}</span>
         <span class="text-xs font-semibold text-slate-500">KWD</span>
         <span class="text-[10px] text-slate-400">· mock</span>
         <span class="ml-auto text-[11px] text-slate-500 font-mono tabular-nums">fuel + ops</span>
@@ -209,10 +244,10 @@
       </div>
       <div class="mt-1 flex items-baseline gap-1.5">
         <span class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-slate-900"
-              x-text="activeTab === 'solver' ? fmtDec(selectedCo2) : '{{ summary.co2_kg_saved|floatformat:1 }}'">{{ summary.co2_kg_saved|floatformat:1 }}</span>
+              x-text="fmtDec(selectedCo2)">{{ summary.co2_kg_saved|floatformat:1 }}</span>
         <span class="text-xs font-semibold text-slate-500">kg CO₂</span>
         <span class="ml-auto text-[11px] text-slate-500 font-mono tabular-nums">
-          <span x-text="activeTab === 'solver' ? selectedMins : {{ summary.dispatcher_minutes_saved }}">{{ summary.dispatcher_minutes_saved }}</span> mins saved
+          <span x-text="selectedMins">{{ summary.dispatcher_minutes_saved }}</span> mins saved
         </span>
       </div>
     </div>
@@ -234,9 +269,20 @@
             {{ proposed_merges|length }} pair{{ proposed_merges|length|pluralize }}
           </span>
         </div>
-        <span class="text-[11px] text-slate-500 font-mono">
-          {% if allow_milk_run %}Same-Corridor + Milk-Run{% else %}Same-Corridor Only{% endif %} · {% if strict_weather %}HSE Strict Weather{% else %}Weather Advisory Mode{% endif %}
-        </span>
+
+        <div class="flex items-center gap-2">
+          <span class="hidden sm:inline text-[11px] text-slate-500 font-mono">
+            {% if allow_milk_run %}Same-Corridor + Milk-Run{% else %}Same-Corridor Only{% endif %} · {% if strict_weather %}HSE Strict Weather{% else %}Weather Advisory Mode{% endif %}
+          </span>
+          {% if proposed_merges %}
+          <button type="button"
+                  @click="toggleSelectAll()"
+                  class="btn btn-ghost btn-xs h-6 min-h-0 px-2 text-[11px] font-semibold text-teal-800 hover:bg-teal-50 border border-teal-200/80">
+            <span x-show="!allSelected" x-cloak>Select All</span>
+            <span x-show="allSelected">Clear</span>
+          </button>
+          {% endif %}
+        </div>
       </div>
 
       {% if proposed_merges %}
@@ -252,10 +298,10 @@
         <input type="hidden" name="strict_weather" value="{{ strict_weather|yesno:'1,0' }}" />
         <input type="hidden" name="allow_milk_run" value="{{ allow_milk_run|yesno:'1,0' }}" />
 
-        <div class="p-3 max-h-[380px] xl:max-h-[440px] overflow-y-auto pr-1 space-y-2.5">
+        <div class="p-3 bg-slate-50/40 max-h-[370px] xl:max-h-[430px] overflow-y-auto space-y-2.5 flex-1">
           {% for merge in proposed_merges %}
-          <div class="surface-card p-3 space-y-2 transition-all"
-               :class="selectedIds.includes('{{ merge.merge_id|escapejs }}') ? 'border-teal-300/80' : 'opacity-65 bg-slate-50/70'">
+          <div class="rounded-xl border bg-white p-3 space-y-2 transition-all"
+               :class="selectedIds.includes('{{ merge.merge_id|escapejs }}') ? 'border-teal-300/90 shadow-sm' : 'border-slate-200 opacity-65 bg-slate-50/70'">
             <!-- Card Header -->
             <div class="flex flex-wrap items-center justify-between gap-2">
               <label for="merge-check-{{ forloop.counter }}" class="flex items-center gap-2 cursor-pointer min-w-0">
@@ -277,15 +323,11 @@
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-50 text-teal-800 border border-teal-200">
                   Milk-Run
                 </span>
-                {% else %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                  Same Corridor
-                </span>
                 {% endif %}
 
                 {% if merge.vessel_reassigned %}
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-50 text-teal-800 border border-teal-200 font-mono tabular-nums">
-                  Right-Sized: {{ merge.primary_trip.vessel.vessel_id }} -&gt; {{ merge.assigned_vessel.vessel_id }}
+                  Right-Sized: {{ merge.primary_trip.vessel.vessel_id }} → {{ merge.assigned_vessel.vessel_id }}
                 </span>
                 {% endif %}
 
@@ -305,15 +347,60 @@
               </div>
             </div>
 
-            <!-- Before -> After Diff Grid -->
+            <!-- Before → After Visual Capacity Diff Grid -->
             <div class="grid grid-cols-1 md:grid-cols-11 gap-2 items-center text-xs">
-              <div class="md:col-span-5 rounded-lg bg-amber-50/70 border border-amber-200/80 px-2.5 py-2 space-y-0.5">
+              <!-- Before: Two Separate Runs with Compact Load Bars -->
+              <div class="md:col-span-5 rounded-lg bg-amber-50/70 border border-amber-200/80 px-2.5 py-2 space-y-1.5">
                 <div class="font-semibold uppercase tracking-wider text-[10px] text-amber-800">Before (2 Separate Runs)</div>
-                <div class="font-mono tabular-nums text-[11px] text-slate-800">
-                  {{ merge.primary_trip.trip_id }} ({{ merge.primary_trip.vessel.vessel_id }} · {{ merge.primary_trip.passengers }} pax · {{ merge.primary_trip.cargo_tonnes|floatformat:1 }} t)
+
+                <div class="flex items-center justify-between gap-2 text-[11px]">
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <button type="button"
+                            hx-get="{% url 'trips:inspect' merge.primary_trip.trip_id %}"
+                            hx-target="#optimizer-trip-inspector-body"
+                            hx-swap="innerHTML"
+                            @click="inspectorOpen = true"
+                            class="font-mono tabular-nums font-semibold text-teal-800 hover:text-teal-950 underline decoration-teal-500/40 shrink-0">
+                      {{ merge.primary_trip.trip_id }}
+                    </button>
+                    <span class="font-mono tabular-nums text-slate-600 truncate">
+                      {{ merge.primary_trip.vessel.vessel_id }} · {{ merge.primary_trip.passengers }}p · {{ merge.primary_trip.cargo_tonnes|floatformat:1 }}t
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <div class="w-12 h-1.5 rounded-full bg-amber-200/70 overflow-hidden" aria-hidden="true">
+                      <div class="h-full rounded-full {% if merge.primary_trip.utilization_pct > 95 %}bg-rose-600{% elif merge.primary_trip.utilization_pct >= 70 %}bg-emerald-600{% elif merge.primary_trip.utilization_pct >= 50 %}bg-teal-600{% else %}bg-amber-500{% endif %}"
+                           style="width: {% if merge.primary_trip.utilization_pct > 100 %}100{% else %}{{ merge.primary_trip.utilization_pct|floatformat:0 }}{% endif %}%"></div>
+                    </div>
+                    <span class="font-mono tabular-nums text-[10px] font-semibold text-slate-700 w-7 text-right">
+                      {{ merge.primary_trip.utilization_pct|floatformat:0 }}%
+                    </span>
+                  </div>
                 </div>
-                <div class="font-mono tabular-nums text-[11px] text-slate-700">
-                  + {{ merge.absorbed_trip.trip_id }} ({{ merge.absorbed_trip.vessel.vessel_id }} · {{ merge.absorbed_trip.passengers }} pax · {{ merge.absorbed_trip.cargo_tonnes|floatformat:1 }} t)
+
+                <div class="flex items-center justify-between gap-2 text-[11px]">
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <button type="button"
+                            hx-get="{% url 'trips:inspect' merge.absorbed_trip.trip_id %}"
+                            hx-target="#optimizer-trip-inspector-body"
+                            hx-swap="innerHTML"
+                            @click="inspectorOpen = true"
+                            class="font-mono tabular-nums font-semibold text-teal-800 hover:text-teal-950 underline decoration-teal-500/40 shrink-0">
+                      {{ merge.absorbed_trip.trip_id }}
+                    </button>
+                    <span class="font-mono tabular-nums text-slate-600 truncate">
+                      {{ merge.absorbed_trip.vessel.vessel_id }} · {{ merge.absorbed_trip.passengers }}p · {{ merge.absorbed_trip.cargo_tonnes|floatformat:1 }}t
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <div class="w-12 h-1.5 rounded-full bg-amber-200/70 overflow-hidden" aria-hidden="true">
+                      <div class="h-full rounded-full {% if merge.absorbed_trip.utilization_pct > 95 %}bg-rose-600{% elif merge.absorbed_trip.utilization_pct >= 70 %}bg-emerald-600{% elif merge.absorbed_trip.utilization_pct >= 50 %}bg-teal-600{% else %}bg-amber-500{% endif %}"
+                           style="width: {% if merge.absorbed_trip.utilization_pct > 100 %}100{% else %}{{ merge.absorbed_trip.utilization_pct|floatformat:0 }}{% endif %}%"></div>
+                    </div>
+                    <span class="font-mono tabular-nums text-[10px] font-semibold text-slate-700 w-7 text-right">
+                      {{ merge.absorbed_trip.utilization_pct|floatformat:0 }}%
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -323,11 +410,25 @@
                 </svg>
               </div>
 
-              <div class="md:col-span-5 rounded-lg bg-emerald-50/70 border border-emerald-200/80 px-2.5 py-2 space-y-0.5">
-                <div class="font-semibold uppercase tracking-wider text-[10px] text-emerald-800">After (1 Consolidated Sailing)</div>
-                <div class="font-mono tabular-nums text-[11px] font-semibold text-slate-900">
-                  {{ merge.assigned_vessel.vessel_id }} ({{ merge.assigned_vessel.vessel_type }}) · {{ merge.combined_util_pct|floatformat:0 }}% load
+              <!-- After: Single Consolidated Sailing with Capacity Bar -->
+              <div class="md:col-span-5 rounded-lg bg-emerald-50/70 border border-emerald-200/80 px-2.5 py-2 space-y-1.5">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="font-semibold uppercase tracking-wider text-[10px] text-emerald-800">After (1 Consolidated Sailing)</span>
+                  <span class="font-mono tabular-nums text-[11px] font-bold {% if merge.combined_util_pct > 95 %}text-rose-700{% elif merge.combined_util_pct >= 70 %}text-emerald-800{% elif merge.combined_util_pct >= 50 %}text-teal-800{% else %}text-amber-800{% endif %}">
+                    {{ merge.combined_util_pct|floatformat:0 }}% load
+                  </span>
                 </div>
+
+                <div class="flex items-center gap-2">
+                  <span class="font-mono tabular-nums text-[11px] font-semibold text-slate-900 shrink-0">
+                    {{ merge.assigned_vessel.vessel_id }}
+                  </span>
+                  <div class="flex-1 h-1.5 rounded-full bg-emerald-200/70 overflow-hidden" aria-hidden="true">
+                    <div class="h-full rounded-full {% if merge.combined_util_pct > 95 %}bg-rose-600{% elif merge.combined_util_pct >= 70 %}bg-emerald-600{% elif merge.combined_util_pct >= 50 %}bg-teal-600{% else %}bg-amber-500{% endif %}"
+                         style="width: {% if merge.combined_util_pct > 100 %}100{% else %}{{ merge.combined_util_pct|floatformat:0 }}{% endif %}%"></div>
+                  </div>
+                </div>
+
                 <div class="font-mono tabular-nums text-[11px] text-emerald-900">
                   {{ merge.combined_pax }}/{{ merge.assigned_vessel.passenger_capacity }} pax · {{ merge.combined_cargo|floatformat:1 }}/{{ merge.assigned_vessel.cargo_capacity_t|floatformat:1 }} t · {{ merge.co2_kg_saved|floatformat:0 }} kg CO₂
                 </div>
@@ -337,16 +438,16 @@
           {% endfor %}
         </div>
 
-        <!-- Compact Bottom Plan Approval Bar -->
-        <div class="px-4 py-2.5 border-t border-slate-200 bg-slate-50/80 flex flex-wrap items-center justify-between gap-2">
+        <!-- Elevated Bottom Plan Approval Bar -->
+        <div class="px-4 py-2.5 border-t border-slate-200 bg-slate-50/90 flex flex-wrap items-center justify-between gap-2">
           <div class="flex items-center gap-2 flex-1 min-w-[200px]">
             <label for="plan-name-input" class="sr-only">Plan name</label>
             <input id="plan-name-input"
                    type="text"
                    name="plan_name"
                    maxlength="120"
-                   placeholder="Optional plan name (e.g. Shift A Consolidation)…"
-                   class="input input-bordered input-xs bg-white w-full max-w-xs text-xs" />
+                   placeholder="{{ default_plan_name }}"
+                   class="input input-bordered input-sm bg-white w-full max-w-xs text-xs" />
           </div>
 
           <div class="flex items-center gap-2.5 shrink-0">
@@ -355,12 +456,16 @@
             </span>
             <button id="approve-plan-btn"
                     type="submit"
-                    class="btn btn-primary btn-xs gap-1.5 font-semibold">
+                    :disabled="selectedCount === 0"
+                    class="btn btn-primary btn-sm gap-1.5 font-semibold">
               <span class="htmx-hide-on-request inline-flex items-center gap-1.5">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M20 6 9 17l-5-5" />
                 </svg>
-                <span>Approve &amp; Save Plan</span>
+                <span x-show="selectedCount > 0">
+                  Approve <span class="font-mono tabular-nums" x-text="selectedCount">{{ proposed_merges|length }}</span> · +<span class="font-mono tabular-nums" x-text="fmtInt(selectedKwd)">{{ summary.kwd_saved|floatformat:0 }}</span> KWD
+                </span>
+                <span x-show="selectedCount === 0" x-cloak>Select a Merge</span>
               </span>
               <span id="approve-spinner" class="htmx-indicator items-center gap-1.5">
                 <span class="loading loading-spinner loading-xs"></span>
@@ -399,74 +504,126 @@
       {% endif %}
     </section>
 
-    <!-- Right 4 Cols: Active HSE Guardrails + Held / Unmerged Queue -->
-    <aside class="lg:col-span-4 space-y-3">
-      <!-- Active HSE Guardrails Rose Card -->
-      <section class="rounded-xl border border-rose-200 bg-rose-50/80 border-l-4 border-l-rose-600 p-3 space-y-2">
-        <div class="flex items-center justify-between gap-2">
-          <div class="flex items-center gap-1.5">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-rose-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-            </svg>
-            <h2 class="text-xs font-semibold uppercase tracking-wider text-rose-900">Active HSE Guardrails</h2>
+    <!-- Right 4 Cols: Unified 2-Tab Card (Held Queue | HSE Locks) -->
+    <aside class="lg:col-span-4">
+      <section class="surface-card overflow-hidden flex flex-col h-full">
+        <!-- Unified Card 2-Tab Header -->
+        <div class="px-3 py-2 border-b border-slate-100 flex items-center justify-between gap-2 bg-slate-50/60">
+          <div class="inline-flex items-center rounded-lg bg-slate-200/70 p-0.5" role="tablist" aria-label="Held queue and HSE locks">
+            <button type="button"
+                    role="tab"
+                    :aria-selected="(rightTab === 'held').toString()"
+                    @click="rightTab = 'held'"
+                    :class="rightTab === 'held' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all">
+              <span>Held Queue</span>
+              <span class="font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700 leading-none">{{ held_trips|length }}</span>
+            </button>
+            <button type="button"
+                    role="tab"
+                    :aria-selected="(rightTab === 'hse').toString()"
+                    @click="rightTab = 'hse'"
+                    :class="rightTab === 'hse' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all">
+              <span>HSE Locks</span>
+              <span class="font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded-full leading-none {% if active_overrides_count > 0 %}bg-rose-100 text-rose-800 border border-rose-200{% else %}bg-slate-100 text-slate-600{% endif %}">
+                {{ active_overrides_count }}
+              </span>
+            </button>
           </div>
-          <a href="{% url 'safety:index' %}" class="btn btn-xs bg-white border-rose-200 text-rose-800 hover:bg-rose-100">
+
+          <a href="{% url 'safety:index' %}?tab=holds"
+             class="btn btn-xs h-6 min-h-0 px-2 bg-white border border-rose-200 text-rose-800 hover:bg-rose-50 font-semibold shrink-0">
             Manage Holds
           </a>
         </div>
 
-        {% if active_overrides %}
-        <div class="max-h-[110px] overflow-y-auto pr-1 space-y-1.5">
-          {% for override in active_overrides %}
-          <div class="rounded-lg bg-white/90 border border-rose-200/80 px-2.5 py-1.5 text-xs">
-            <div class="flex items-center justify-between gap-2">
-              <span class="font-mono font-semibold text-rose-900 text-[11px]">
-                {% if override.vessel %}{{ override.vessel.vessel_id }}{% elif override.destination %}{{ override.destination }}{% else %}Fleet Rule{% endif %}
-              </span>
-              <span class="text-[10px] font-semibold uppercase tracking-wider text-rose-700">
-                {{ override.get_rule_type_display }}
-              </span>
-            </div>
-            <p class="text-[11px] text-slate-600 truncate mt-0.5">{{ override.reason }}</p>
+        <!-- Tab 1: Held Queue with 3 Quick Filter Chips -->
+        <div x-show="rightTab === 'held'" class="flex flex-col flex-1 min-h-0">
+          <div class="px-3 py-1.5 border-b border-slate-100 flex items-center gap-1.5 bg-white" role="group" aria-label="Filter held queue">
+            <button type="button"
+                    @click="heldFilter = 'all'"
+                    :class="heldFilter === 'all' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
+                    class="px-2 py-0.5 rounded-full border text-[10px] font-semibold transition-colors">
+              All <span class="font-mono tabular-nums opacity-85">{{ held_trips|length }}</span>
+            </button>
+            <button type="button"
+                    @click="heldFilter = 'hse'"
+                    :class="heldFilter === 'hse' ? 'bg-rose-600 text-white border-rose-600' : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100/70'"
+                    class="px-2 py-0.5 rounded-full border text-[10px] font-semibold transition-colors">
+              HSE Blocked <span class="font-mono tabular-nums">{{ held_hse_count }}</span>
+            </button>
+            <button type="button"
+                    @click="heldFilter = 'other'"
+                    :class="heldFilter === 'other' ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200/70'"
+                    class="px-2 py-0.5 rounded-full border text-[10px] font-semibold transition-colors">
+              Other <span class="font-mono tabular-nums" x-text="heldOtherCount"></span>
+            </button>
           </div>
-          {% endfor %}
-        </div>
-        {% else %}
-        <p class="text-xs text-rose-800/80">No active HSE locks or holds enforcing exclusions.</p>
-        {% endif %}
-      </section>
 
-      <!-- Held / Unmerged Queue -->
-      <section class="surface-card overflow-hidden">
-        <div class="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between gap-2">
-          <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-700">Held / Unmerged Queue</h2>
-          <span class="font-mono tabular-nums text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-            {{ held_trips|length }}
-          </span>
-        </div>
-
-        <div class="p-2.5 max-h-[240px] xl:max-h-[300px] overflow-y-auto space-y-1.5">
-          {% if held_trips %}
-          {% for item in held_trips %}
-          <div class="rounded-lg border border-slate-200/80 bg-slate-50/50 px-2.5 py-1.5 space-y-0.5">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center gap-1.5 min-w-0">
-                <span class="font-mono tabular-nums text-[11px] font-semibold text-slate-900 shrink-0">{{ item.trip.trip_id }}</span>
-                <span class="text-[11px] text-slate-600 truncate">{{ item.trip.vessel.vessel_id }} · {{ item.trip.destination }}</span>
+          <div class="p-2.5 max-h-[345px] xl:max-h-[405px] overflow-y-auto space-y-1.5 flex-1">
+            {% if held_trips %}
+            {% for item in held_trips %}
+            <div x-show="heldFilter === 'all' || (heldFilter === 'hse' && '{{ item.badge_tone }}' === 'rose') || (heldFilter === 'other' && '{{ item.badge_tone }}' !== 'rose')"
+                 class="rounded-lg border border-slate-200/80 bg-slate-50/50 px-2.5 py-1.5 space-y-0.5 hover:border-slate-300 transition-colors">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <button type="button"
+                          hx-get="{% url 'trips:inspect' item.trip.trip_id %}"
+                          hx-target="#optimizer-trip-inspector-body"
+                          hx-swap="innerHTML"
+                          @click="inspectorOpen = true"
+                          class="font-mono tabular-nums text-[11px] font-semibold text-teal-700 hover:text-teal-950 underline decoration-teal-500/40 shrink-0">
+                    {{ item.trip.trip_id }}
+                  </button>
+                  <span class="text-[11px] text-slate-600 truncate">{{ item.trip.vessel.vessel_id }} · {{ item.trip.destination }}</span>
+                </div>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border shrink-0 {% if item.badge_tone == 'rose' %}bg-rose-50 text-rose-800 border-rose-200{% elif item.badge_tone == 'amber' %}bg-amber-50 text-amber-900 border-amber-200{% else %}bg-slate-100 text-slate-700 border-slate-200{% endif %}">
+                  {{ item.badge_label }}
+                </span>
               </div>
-              <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border shrink-0 {% if item.badge_tone == 'rose' %}bg-rose-50 text-rose-800 border-rose-200{% elif item.badge_tone == 'amber' %}bg-amber-50 text-amber-900 border-amber-200{% else %}bg-slate-100 text-slate-700 border-slate-200{% endif %}">
-                {{ item.badge_label }}
-              </span>
+              <div class="flex items-center justify-between gap-2 text-[10px] text-slate-500">
+                <span class="truncate">{{ item.reason }}</span>
+                <span class="font-mono tabular-nums shrink-0">{{ item.trip.departure_dt|date:"H:i" }} · {{ item.trip.utilization_pct|floatformat:0 }}%</span>
+              </div>
             </div>
-            <div class="flex items-center justify-between gap-2 text-[10px] text-slate-500">
-              <span class="truncate">{{ item.reason }}</span>
-              <span class="font-mono tabular-nums shrink-0">{{ item.trip.departure_dt|date:"H:i" }} · {{ item.trip.utilization_pct|floatformat:0 }}%</span>
-            </div>
+            {% endfor %}
+            {% else %}
+            <p class="text-xs text-slate-500 py-8 text-center">All pending trips matched into proposed merges.</p>
+            {% endif %}
           </div>
-          {% endfor %}
-          {% else %}
-          <p class="text-xs text-slate-500 py-4 text-center">All pending trips matched into proposed merges.</p>
-          {% endif %}
+        </div>
+
+        <!-- Tab 2: Active HSE Locks -->
+        <div x-show="rightTab === 'hse'" x-cloak style="display: none;" class="flex flex-col flex-1 min-h-0">
+          <div class="p-3 max-h-[380px] xl:max-h-[440px] overflow-y-auto space-y-2 flex-1">
+            {% if active_overrides %}
+            {% for override in active_overrides %}
+            <div class="rounded-xl border border-rose-200 bg-rose-50/75 border-l-4 border-l-rose-600 p-2.5 text-xs space-y-1">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-mono font-bold text-rose-950 text-[11px]">
+                  {% if override.vessel %}{{ override.vessel.vessel_id }}{% elif override.destination %}{{ override.destination }}{% else %}Fleet Rule{% endif %}
+                </span>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-rose-100 text-rose-800">
+                  {{ override.get_rule_type_display }}
+                </span>
+              </div>
+              <p class="text-[11px] text-slate-700 leading-snug">{{ override.reason }}</p>
+              <div class="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
+                <span>{{ override.created_by_role }}</span>
+                <span class="font-mono uppercase text-rose-700 font-semibold">{{ override.get_severity_display }}</span>
+              </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="py-8 text-center space-y-2">
+              <p class="text-xs text-slate-600">No active HSE locks or holds enforcing exclusions.</p>
+              <a href="{% url 'safety:index' %}?tab=holds" class="btn btn-outline btn-xs border-slate-300 text-slate-700">
+                Open Safety &amp; Fuel Guard
+              </a>
+            </div>
+            {% endif %}
+          </div>
         </div>
       </section>
     </aside>
@@ -485,14 +642,14 @@
       <div class="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between gap-2">
         <div>
           <h2 class="text-sm font-semibold text-slate-900">Persisted Shift Dispatch Plans</h2>
-          <p class="text-[11px] text-slate-500">Saved consolidation plans in PostgreSQL with 1-click queue revert</p>
+          <p class="text-[11px] text-slate-500">Persisted shift consolidation plans with 1-click queue revert</p>
         </div>
         <span class="font-mono tabular-nums text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold">
           {{ approved_plans_count }} approved
         </span>
       </div>
 
-      <div class="max-h-[420px] overflow-y-auto overflow-x-auto">
+      <div class="max-h-[470px] overflow-y-auto overflow-x-auto">
         <table class="table table-xs w-full">
           <thead class="sticky top-0 z-10 bg-slate-50">
             <tr class="text-slate-500 text-[10px] uppercase tracking-wider border-b border-slate-200">
@@ -509,8 +666,19 @@
             {% for plan in saved_plans %}
             <tr class="hover:bg-slate-50/80 transition-colors">
               <td class="py-1.5">
-                <div class="font-semibold text-slate-900 truncate max-w-[190px]">{{ plan.name }}</div>
-                <div class="font-mono tabular-nums text-[10px] text-slate-400">{{ plan.created_at|date:"Y-m-d H:i" }}</div>
+                <div class="font-semibold text-slate-900 truncate max-w-[180px]">{{ plan.name }}</div>
+                <div class="flex items-center gap-2 mt-0.5">
+                  <span class="font-mono tabular-nums text-[10px] text-slate-400">{{ plan.created_at|date:"Y-m-d H:i" }}</span>
+                  {% if plan.plan_payload.merges %}
+                  <button type="button"
+                          @click="expandedPlanId = expandedPlanId === {{ plan.pk }} ? null : {{ plan.pk }}"
+                          :aria-expanded="(expandedPlanId === {{ plan.pk }}).toString()"
+                          class="text-[10px] font-semibold text-teal-700 hover:text-teal-900 underline decoration-teal-500/40">
+                    <span x-show="expandedPlanId !== {{ plan.pk }}">Details</span>
+                    <span x-show="expandedPlanId === {{ plan.pk }}" x-cloak>Hide</span>
+                  </button>
+                  {% endif %}
+                </div>
               </td>
               <td class="py-1.5">
                 {% if plan.is_approved %}
@@ -527,7 +695,7 @@
               <td class="py-1.5 text-right font-mono tabular-nums text-slate-700">{{ plan.fuel_liters_saved|floatformat:1 }}</td>
               <td class="py-1.5 text-right font-mono tabular-nums font-semibold text-emerald-700">{{ plan.kwd_saved|floatformat:0 }}</td>
               <td class="py-1.5 text-right font-mono tabular-nums text-slate-600">{{ plan.co2_kg_saved|floatformat:1 }}</td>
-              <td class="py-1.5 text-right">
+              <td class="py-1.5 text-right whitespace-nowrap">
                 {% if plan.is_approved %}
                 <form method="post"
                       action="{% url 'optimizer:revert_plan' plan.pk %}"
@@ -536,25 +704,71 @@
                       hx-swap="outerHTML"
                       hx-indicator="#revert-spinner-{{ plan.pk }}"
                       hx-disabled-elt="#revert-btn-{{ plan.pk }}"
-                      class="inline">
+                      class="inline-flex items-center justify-end gap-1">
                   {% csrf_token %}
                   <input type="hidden" name="strict_weather" value="{{ strict_weather|yesno:'1,0' }}" />
                   <input type="hidden" name="allow_milk_run" value="{{ allow_milk_run|yesno:'1,0' }}" />
-                  <button id="revert-btn-{{ plan.pk }}"
-                          type="submit"
+
+                  <button type="button"
+                          x-show="confirmRevertId !== {{ plan.pk }}"
+                          @click="confirmRevertId = {{ plan.pk }}"
                           class="btn btn-outline btn-xs border-rose-200 text-rose-800 hover:bg-rose-50 hover:border-rose-300">
-                    <span class="htmx-hide-on-request">Revert Plan</span>
-                    <span id="revert-spinner-{{ plan.pk }}" class="htmx-indicator items-center gap-1">
-                      <span class="loading loading-spinner loading-xs"></span>
-                      <span>Reverting…</span>
-                    </span>
+                    Revert
                   </button>
+
+                  <span x-show="confirmRevertId === {{ plan.pk }}" x-cloak class="inline-flex items-center gap-1">
+                    <button id="revert-btn-{{ plan.pk }}"
+                            type="submit"
+                            class="btn btn-xs bg-rose-600 hover:bg-rose-700 text-white border-rose-600 font-semibold">
+                      <span class="htmx-hide-on-request">Confirm?</span>
+                      <span id="revert-spinner-{{ plan.pk }}" class="htmx-indicator items-center gap-1">
+                        <span class="loading loading-spinner loading-xs"></span>
+                        <span>Reverting…</span>
+                      </span>
+                    </button>
+                    <button type="button"
+                            @click="confirmRevertId = null"
+                            class="btn btn-ghost btn-xs text-slate-500 hover:text-slate-800 px-1.5">
+                      Cancel
+                    </button>
+                  </span>
                 </form>
                 {% else %}
                 <span class="text-[11px] text-slate-400 font-mono">Restored</span>
                 {% endif %}
               </td>
             </tr>
+            {% if plan.plan_payload.merges %}
+            <tr x-show="expandedPlanId === {{ plan.pk }}" x-cloak style="display: none;" class="bg-slate-50/80">
+              <td colspan="7" class="px-4 py-2.5">
+                <div class="space-y-1.5">
+                  <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    Consolidated Merge Pairs ({{ plan.plan_payload.merges|length }})
+                  </div>
+                  <div class="space-y-1">
+                    {% for m in plan.plan_payload.merges %}
+                    <div class="rounded-lg bg-white border border-slate-200/80 px-2.5 py-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                      <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+                        <span class="font-semibold text-slate-900">{{ m.route_label }}</span>
+                        <span class="font-mono tabular-nums text-slate-600">
+                          {{ m.primary_trip_id }} + {{ m.absorbed_trip_id }} → {{ m.assigned_vessel_code }}
+                        </span>
+                        {% if m.vessel_reassigned %}
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-teal-50 text-teal-800 border border-teal-200">
+                          {{ m.original_vessel_code }} → {{ m.assigned_vessel_code }}
+                        </span>
+                        {% endif %}
+                      </div>
+                      <span class="font-mono tabular-nums font-semibold text-emerald-700 shrink-0">
+                        {{ m.combined_util_pct|floatformat:0 }}% · +{{ m.kwd_saved|floatformat:0 }} KWD · {{ m.fuel_saved_l|floatformat:0 }} L
+                      </span>
+                    </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
             {% empty %}
             <tr>
               <td colspan="7" class="py-8 text-center text-xs text-slate-500">
@@ -628,7 +842,14 @@
               <tr class="hover:bg-slate-50/80">
                 <td class="py-1.5 font-medium text-slate-800">{{ row.destination }}</td>
                 <td class="py-1.5 text-right font-mono tabular-nums font-semibold text-teal-800">{{ row.merges }}</td>
-                <td class="py-1.5 text-right font-mono tabular-nums font-semibold text-emerald-700">{{ row.merge_fuel_l|floatformat:"0g" }}</td>
+                <td class="py-1.5 text-right">
+                  <div class="flex items-center justify-end gap-2">
+                    <div class="w-16 h-1.5 rounded-full bg-slate-100 overflow-hidden shrink-0" aria-hidden="true">
+                      <div class="h-full rounded-full bg-emerald-500" style="width: {{ row.fuel_bar_pct|default:0 }}%"></div>
+                    </div>
+                    <span class="font-mono tabular-nums font-semibold text-emerald-700 w-12 text-right">{{ row.merge_fuel_l|floatformat:"0g" }}</span>
+                  </div>
+                </td>
                 <td class="py-1.5 text-right font-mono tabular-nums text-amber-800">{{ row.idle_fuel_l|floatformat:"0g" }}</td>
               </tr>
               {% empty %}
@@ -641,5 +862,41 @@
         </div>
       </section>
     </aside>
+  </div>
+
+  <!-- Centered Command Modal for Trip Telemetry Inspector (HTMX+Alpine Settle Safe) -->
+  <div id="optimizer-trip-inspector-modal"
+       x-show="inspectorOpen"
+       x-cloak
+       style="display: none;"
+       :class="{ 'flex': inspectorOpen, 'hidden': !inspectorOpen }"
+       x-transition.opacity.duration.150ms
+       @click.self="inspectorOpen = false"
+       class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
+       role="dialog"
+       aria-modal="true"
+       aria-labelledby="optimizer-trip-inspector-title">
+    <div class="w-full max-w-2xl bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+      <div id="optimizer-trip-inspector-body" class="flex flex-col min-h-0 flex-1 overflow-hidden">
+        <div class="px-5 py-3.5 bg-[#0A1628] text-slate-100 flex items-center justify-between gap-3 shrink-0">
+          <div>
+            <h2 id="optimizer-trip-inspector-title" class="text-sm font-bold text-white">Trip Telemetry Inspector</h2>
+            <p class="text-[11px] text-slate-400">Loading capacity, fuel audit &amp; corridor context…</p>
+          </div>
+          <button type="button"
+                  @click="inspectorOpen = false"
+                  class="btn btn-ghost btn-xs btn-square text-slate-300 hover:text-white"
+                  aria-label="Close trip inspector">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+            </svg>
+          </button>
+        </div>
+        <div class="p-6 flex items-center gap-2 text-xs text-slate-500">
+          <span class="loading loading-spinner loading-xs"></span>
+          <span>Loading trip telemetry…</span>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
