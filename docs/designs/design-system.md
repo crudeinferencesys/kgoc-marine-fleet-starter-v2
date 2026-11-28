@@ -6,7 +6,7 @@
 ---
 
 ## 1. Aesthetic Direction — "Hybrid Maritime Command"
-- **Shell:** Deep Maritime Navy pop-out left sidebar drawer (`#0A1628`, toggled via topbar hamburger menu on desktop and mobile) paired with an airy, high-readability light operational workspace (`#F6F8FB`) and frosted sticky topbar (`bg-white/85 backdrop-blur-md`).
+- **Shell:** Deep Maritime Navy (`#0A1628`) sticky top navigation bar with direct links to all 5 operational pages (`Control Tower`, `Trips`, `Optimizer`, `Safety`, `AI Co-Pilot` — zero burger menu) plus live `/health/` indicator, paired with a light operational workspace (`#F6F8FB`).
 - **Cards & Depth:** Crisp white elevated surfaces (`.surface-card`: `#FFFFFF`, hairline `rgba(226,232,240,0.92)` border, subtle two-step elevation shadow, `14px` radius).
 - **Template Blocks Available in `templates/base.html`:**
   - `{% block title %}` — `<title>` tag (`Page · CrudeInference · KGOC Marine Fleet`)
