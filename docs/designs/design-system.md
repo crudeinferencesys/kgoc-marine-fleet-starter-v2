@@ -150,6 +150,7 @@ Color mapping: `< 50%` Amber (`bg-amber-500`), `50–69%` Teal (`bg-teal-600`), 
 ```
 
 ### 6. Responsive Data Table
+Paginate dense operational tables by default (`8` rows default, selectable `8 / 15 / 25`) so tables fit a single desktop viewport without inner scrolling, and pair with a 1-click filtered `Export CSV` link for deep dives.
 ```html
 <section class="surface-card overflow-hidden">
   <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
@@ -219,58 +220,57 @@ const CHART_PALETTE = {
 
 ---
 
-## 6. Cutting-Edge Interaction Patterns (Scroll, Smart Forms, Discovery, Tactical Map, Quiet Cockpit)
+## 6. Cutting-Edge Interaction Patterns (Scroll, Simple-Menu Workflows, Discovery & Pagination, Quiet Cockpit)
 
 ### 1. Scroll-Aware Sections (`base.html` Mobile/Overflow Fallback)
 `templates/base.html` provides a `2.5px` topbar scroll progress hairline (`animation-timeline: scroll()`), a dynamic depth + section pill (`#topbar-scroll-context`), and a back-to-top button as graceful fallbacks for mobile or narrow viewports. Desktop pages (`>= 1280×760`) should remain zero-scroll above the fold; tag major page bands with `data-scroll-section` and `data-scroll-label`, and apply `.scroll-reveal` only if a secondary band sits below the fold on narrow screens:
 ```html
-<section id="fleet-map" data-scroll-section data-scroll-label="Offshore Map" class="surface-card p-5 scroll-reveal">
+<section id="trips-ledger-section" data-scroll-section data-scroll-label="Trip Ledger" class="surface-card p-5 scroll-reveal">
   ...
 </section>
 ```
 
-### 2. One-Page Progressive Input Forms (Smart Defaults + Remaining Counter + Skip Optional)
-Keep user input on a single screen: pre-fill probable operational defaults (`Flexible Window: Yes`, `Weather: Calm`, `Priority: Routine`), show a live Alpine counter of remaining required inputs + load preview, place optional details inside `<details>` with an explicit **Use defaults & submit** / **Skip optional** exit hatch, and use `.field-control` for calm `:user-invalid` validation:
+### 2. Dedicated Simple-Menu User-Input Workflow (Centered Tab — Not a Sidebar)
+Whenever a workflow requires user data creation (e.g., logging a new trip on `/trips/`, configuring solver/hold inputs on `/optimizer/` or `/safety/`, or submitting directives on `/copilot/`), **never place the form inside a slide-over sidebar or cramped side column** (reserve slide-over drawers strictly for read-only inspection such as the Trip Telemetry Inspector):
+- **Dedicated Centered Workflow Tab:** Switch cleanly into a focused `max-w-4xl mx-auto` workspace tab (`Log New Trip` / `?book=1` with `← Back to Ledger`), hiding Band-2 KPI cards while keeping KPI & table containers mounted in the DOM so HTMX `hx-swap-oob="outerHTML"` refreshes them silently in the background.
+- **Simple-Menu Guided Steps:** Split inputs into calm, un-overwhelming steps (e.g., `1. Route & Mission` → `2. Vessel & Payload` → `3. Optional Details`) using tappable menu cards/pills over raw `<select>` dropdowns whenever options are bounded.
+- **Progress, Smart Defaults & Skip Options:** Render a Deep Maritime Navy (`#0A1628`) step progress bar + explicit remaining-inputs label (`Step 1 of 3 · 1 core step + 1 optional step left`), clickable step pills + live selection summary pill, pre-applied smart defaults (`08:30 · Calm · Routine · Flexible Window`), and a 1-click **Skip optional & submit with defaults** exit hatch available from every step, followed by a focused post-submit confirmation screen (`Log Another`, `View in Ledger`, `Inspect`, next-slice CTA).
+- **HTMX + Alpine Settle Rule:** Keep all steps mounted with `x-show` (never `x-if` so skipped submissions send every field), use `.field-control` for calm `:user-invalid` validation, and put explicit `style="display: none;"` + `:class="{ 'hidden': ... }"` on any initially hidden element with an `id` inside an `hx-swap="outerHTML"` target so HTMX settle never strips `display: none`.
 ```html
-<form x-data="{ dest: '', pax: 6, cap: 20, showOptional: false, get remaining() { return (this.dest ? 0 : 1) + (this.pax >= 0 ? 0 : 1); } }">
-  <div class="flex items-center justify-between text-xs mb-3">
-    <span class="font-medium text-slate-600"
-          x-text="remaining === 0 ? 'Ready · Est. ' + Math.round((pax / cap) * 100) + '% load' : remaining + ' decision remaining'"></span>
-    <span class="font-mono tabular-nums text-amber-700" x-show="pax / cap < 0.5">Half-empty (&lt;50%)</span>
+<section id="trip-booking-workflow" x-show="activeTab === 'book'" x-cloak class="max-w-4xl mx-auto">
+  <div id="trips-booking-panel" x-data="{ showConfirmation: false }" class="surface-card overflow-hidden">
+    <form method="post" action="..." hx-post="..." hx-target="#trips-booking-panel" hx-swap="outerHTML"
+          x-data="{ step: 1 }">
+      <!-- Deep Navy header + teal progress bar + remaining-inputs indicator -->
+      <!-- Step 1..3 using x-show (plus style="display: none;" + :class on #optional-trip-details) -->
+      <!-- Footer: ← Back | Skip optional & submit with defaults | Next Step → / Submit -->
+    </form>
   </div>
-  <!-- Place format hints above the input; never flash red while typing -->
-  <label for="id_dest" class="block text-xs font-semibold text-slate-700">Destination *</label>
-  <span id="dest-hint" class="block text-[11px] text-slate-500 mb-1">Select offshore platform or terminal</span>
-  <select id="id_dest" name="destination" x-model="dest" required aria-describedby="dest-hint" data-error="dest-error"
-          class="select select-bordered select-sm w-full field-control">...</select>
-  <p id="dest-error" class="field-error-msg">Choose a destination before logging the trip.</p>
-
-  <details class="mt-3 rounded-lg bg-slate-50 border border-slate-200/80 p-3" :open="showOptional">
-    <summary class="cursor-pointer text-xs font-medium text-slate-600 select-none">+ Optional timing window &amp; dispatcher notes (defaults applied)</summary>
-    <div class="mt-3 space-y-2"><!-- Optional fields --></div>
-  </details>
-  <div class="mt-4 flex items-center justify-between gap-2">
-    <button type="submit" class="btn btn-ghost btn-xs text-slate-500">Skip optional &amp; submit</button>
-    <button type="submit" class="btn btn-primary btn-sm">Log Trip Request</button>
-  </div>
-</form>
+</section>
 ```
 
-### 3. Gaming-Inspired Complex Discovery (Preset Chips + Facets + Slide-Over Inspector)
-Avoid deep dropdown trees for the 988-trip ledger. Pair 1-click **DIM-style saved filter presets** (with live counts) and removable active-filter chips with a right-side **Alpine Slide-Over Inspector** (`TR-00012`) so users never lose table scroll position:
+### 3. Direct 1-Line Discovery, Categorized More Filters Overlay & Pagination / CSV Export
+Keep the default table control bar to **1 simple direct line** without exposing a wall of dropdowns:
+- **1-Line Control Bar:** Live search input (`q`) + 3–4 quick preset chips with live counts (`All`, `Pending`, `Half-Empty`, `Fuel Outliers`) + **`More Filters`** button + **`Export CSV`** link.
+- **Categorized `More Filters` Full-Screen Overlay Modal:** Group power-user filters into logical domain categories (e.g., `Route & Area`, `Fleet & Crew`, `Sea State & Fuel Audit`) navigated via `←` / `→` arrow buttons, keyboard arrow keys, and category tabs with active filter counts, plus removable active-filter chips above the table. When nested inside an HTMX `outerHTML`-swapped table panel, always render the closed modal with `style="display: none;"`, `hidden`, `x-cloak`, and `:class="{ 'flex': moreOpen, 'hidden': !moreOpen }"`.
+- **Default Pagination & Filtered CSV Export:** Paginate dense ledgers (`8` rows default, `8 / 15 / 25` switcher) so the workspace stays zero-scroll on desktop, paired with a filtered **`Export CSV`** download (with formula-injection escaping) and a right slide-over **Inspector** (`TR-00012`) for row deep dives:
 ```html
-<div class="flex flex-wrap items-center gap-1.5 mb-3">
-  <button hx-get="{% url 'trips:index' %}?preset=all" class="btn btn-xs rounded-full">All <span class="font-mono tabular-nums">988</span></button>
-  <button hx-get="{% url 'trips:index' %}?preset=pending" class="btn btn-xs rounded-full bg-teal-50 text-teal-800 border-teal-200">Pending Queue <span class="font-mono tabular-nums">12</span></button>
-  <button hx-get="{% url 'trips:index' %}?preset=half_empty" class="btn btn-xs rounded-full bg-amber-50 text-amber-900 border-amber-200">Half-Empty &lt;50% <span class="font-mono tabular-nums">616</span></button>
-  <button hx-get="{% url 'trips:index' %}?preset=outliers" class="btn btn-xs rounded-full bg-rose-50 text-rose-800 border-rose-200">Fuel Outliers <span class="font-mono tabular-nums">22</span></button>
+<div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-100">
+  <div class="flex flex-wrap items-center gap-1.5">
+    <input type="text" name="q" placeholder="Search Trip, Req, note…" class="input input-bordered input-xs w-44 sm:w-56" />
+    <button hx-get="{% url 'trips:ledger' %}?status=all" class="btn btn-xs rounded-full">All <span class="font-mono tabular-nums">988</span></button>
+    <button hx-get="{% url 'trips:ledger' %}?status=pending" class="btn btn-xs rounded-full bg-teal-50 text-teal-900 border-teal-200">Pending</button>
+    <button hx-get="{% url 'trips:ledger' %}?half_empty=1" class="btn btn-xs rounded-full bg-amber-50 text-amber-900 border-amber-200">Half-Empty</button>
+    <button hx-get="{% url 'trips:ledger' %}?anomaly=high" class="btn btn-xs rounded-full bg-rose-50 text-rose-800 border-rose-200">Fuel Outliers</button>
+  </div>
+  <div class="flex items-center gap-1.5">
+    <button type="button" @click="moreOpen = true" class="btn btn-xs bg-white border-slate-200">More Filters</button>
+    <a href="{% url 'trips:export_csv' %}" class="btn btn-xs bg-white border-slate-200">Export CSV</a>
+  </div>
 </div>
 ```
 
-### 4. Interactive KJO Offshore Tactical Map (SVG Radar Plot + Layer Toggles)
-Because the KJO dataset uses named offshore hubs (`Marine Base` → `Platform A/B/C`, `Offshore Terminal`, `Maintenance Area`) and `distance_nm` rather than live AIS GPS coordinates, build zero-latency inline SVG radar plots (`#0A1628` desaturated chart canvas, `10 / 25 / 40 nm` range rings, route arcs, vessel status halos, Windy-style `Weather / HSE Holds` toggle, and click-node-to-filter HTMX triggers) — clearly labeled as a schematic mock plot.
-
-### 5. Quiet-by-Default ("Dark Cockpit") Dashboard Discipline
+### 4. Quiet-by-Default ("Dark Cockpit") Dashboard Discipline
 - Keep nominal operational rows (`Normal` fuel, `Calm` sea, `Available`) visually quiet in neutral slate/white so **only exceptions and savings opportunities pop** (`Amber` half-empty waste, `Rose` fuel outliers / active HSE holds, `Emerald` verified KWD/CO₂ savings, `Indigo` Gemini 4 Co-Pilot).
 - Always pair semantic color with an inline stroke SVG icon + explicit label (`2.07x · Investigate Fuel`, `CB-07 Standby Lock`), and display an inline impact summary right before committing persisted actions (`Approve & Save Plan`, `Activate Hold`).
 
@@ -278,6 +278,8 @@ Because the KJO dataset uses named offshore hubs (`Marine Base` → `Platform A/
 
 ## 7. Anti-Patterns Checklist (Do Not Ship)
 - Do **not** let desktop pages (`>= 1280×760`) overflow vertically into full-page scrolling — keep Control Tower (`/`) and core workspaces zero-scroll above the fold (use tabs, 2×2 grids, compact spacing, and bounded table scroll if needed).
+- Do **not** place user data-creation forms inside slide-over sidebars or cramped side columns — use a dedicated centered simple-menu workflow tab (reserve slide-over drawers for read-only inspection).
+- Do **not** add an offshore tactical map or unrequested extra visualizations outside the agreed scope.
 - Do **not** render developer/infrastructure metadata (`DB: sqlite3`, `gemini-4-hydrogen` model pills, `/health/` buttons) inside the global navbar or executive page bodies.
 - Do **not** add duplicate cross-page navigation buttons (`Open Optimizer`, `HSE Holds`, `Dispatch Optimizer`) inside headers when all 5 routes already live in `#primary-top-nav`.
 - Do **not** leave starter/developer copy (`Teammate A`, `apps/trips/`, `Ready for Feature 1...`) in final slice templates.
