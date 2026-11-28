@@ -511,9 +511,11 @@
   <div id="trips-more-filters-modal"
        x-show="moreOpen"
        x-cloak
+       style="display: none;"
+       :class="{ 'flex': moreOpen, 'hidden': !moreOpen }"
        x-transition.opacity.duration.150ms
        @click.self="moreOpen = false"
-       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
+       class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
        role="dialog"
        aria-modal="true"
        aria-labelledby="more-filters-title">

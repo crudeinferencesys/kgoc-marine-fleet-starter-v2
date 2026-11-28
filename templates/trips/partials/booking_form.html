@@ -568,7 +568,12 @@
       </div>
 
       <!-- Step 3: Optional Details (Smart Defaults Applied · Skippable) -->
-      <div id="optional-trip-details" x-show="step === 3" x-cloak class="space-y-4">
+      <div id="optional-trip-details"
+           x-show="step === 3"
+           x-cloak
+           {% if not form.departure_time.errors and not form.weather.errors and not form.priority.errors and not form.notes.errors %}style="display: none;"{% endif %}
+           :class="{ 'hidden': step !== 3 }"
+           class="{% if not form.departure_time.errors and not form.weather.errors and not form.priority.errors and not form.notes.errors %}hidden {% endif %}space-y-4">
         <div class="rounded-xl border border-teal-200 bg-teal-50/75 px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2">
           <div class="text-xs text-teal-950">
             <span class="font-semibold">Optional Step · Smart defaults pre-applied:</span>

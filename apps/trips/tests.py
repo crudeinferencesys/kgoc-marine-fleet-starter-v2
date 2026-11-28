@@ -410,3 +410,15 @@ class TripsViewIntegrationTests(TestCase):
         body = csv_response.content.decode("utf-8")
         self.assertIn("TR-QUEUE-01", body)
         self.assertNotIn("TR-QUEUE-05", body)
+
+    def test_ledger_partial_keeps_more_filters_modal_hidden_for_htmx_settle(self):
+        for res in (
+            self.client.get(reverse("trips:index")),
+            self.client.get(reverse("trips:ledger"), data={"status": "pending", "page": "1"}),
+        ):
+            self.assertEqual(res.status_code, 200)
+            self.assertContains(res, 'id="trips-more-filters-modal"')
+            self.assertContains(res, 'style="display: none;"')
+            self.assertContains(res, ":class=\"{ 'flex': moreOpen, 'hidden': !moreOpen }\"")
+            self.assertContains(res, 'class="hidden fixed inset-0')
+            self.assertNotContains(res, 'class="fixed inset-0 z-50 flex')
