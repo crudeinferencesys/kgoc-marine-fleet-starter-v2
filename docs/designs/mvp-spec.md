@@ -1,37 +1,40 @@
 # MVP Specification — Theme 4: Marine Fleet Utilization & Optimization
 
-> **Status:** Pre-Kickoff Blueprint Locked (10:30 AM) — finalize Section 2 & confirm exact columns in Section 3 right after running `python manage.py inspect_dataset <path>` at 11:00 AM (fallback to synthetic generator if dataset is delayed >15 min), then run one focused Goldfish check before freezing `apps/core/models.py`.
+> **Status:** Schema Frozen (11:45 AM) — `apps/core/models.py`, `apps/core/constants.py`, `0001_initial.py`, and `seed_fleet` are locked on `main`. Both slices build cleanly on these shared contracts.
 
 ---
 
 ## 1. Problem & Target User
-- **Target User:** KGOC / KJO Offshore Marine Fleet Dispatchers & Marine Operations Supervisors managing crew boats (16–22 pax), utility boats (7–9 tons cargo), multipurpose vessels, and standby vessels operating between marine bases and offshore platforms.
-- **Core Pain Point:** Frequent under-utilized / half-empty sailings, unflagged fuel-burn anomalies, and manual shift scheduling that misses safe consolidation opportunities across overlapping platform runs.
+- **Target User:** KGOC / KJO Offshore Marine Fleet Dispatchers & Marine Operations Supervisors managing crew boats (`CB-01`–`CB-04`, `CB-07`: 16–22 pax), utility boats (`CB-05`, `CB-06`: 7–9 t cargo), and multi-purpose vessels (`CB-08`: 14 pax, 5 t cargo) between `Marine Base` and offshore platforms/terminals.
+- **Core Pain Point:** 63.1% of historical sailings depart below 50% capacity (35.8% avg passenger utilization), 572.6 hours (13,438 L) are lost to non-productive idle time, and fuel-burn outliers up to 2.07× expected consumption require systematic engineering investigation without overriding marine weather/standby safety.
 
 ---
 
-## 2. Organizer Dataset Inspection & Dual-Mode Data Strategy
-- **Expected Source (11:00 AM):** Organizer-provided Theme 4 mock dataset (8 vessels, 976 trips over 90 days).
-  - **15-Min Contingency Rule:** If the organizer dataset is unavailable or delayed >15 minutes past 11:00 AM, immediately fall back to a realistic synthetic `seed_fleet` generator (8 vessels, 976 completed trips over 90 days), clearly labeled as mock/synthetic data.
-- **Actual Sheets & Columns Observed:** *(Paste `python manage.py inspect_dataset <path>` summary here at 11:00 AM)*
-- **Key Edge Cases Observed:** *(e.g. cancellations, zero-cargo/pax positioning runs, missing timestamps, extreme fuel outliers)*
-- **Dual-Mode Lifecycle (Historical + Live Shift Queue):**
-  - Seed the **976 `completed` historical trips** across 90 days (powers `/trips/` utilization analytics, `/safety/` statistical fuel-burn anomaly detection, and the 90-day historical backtest headline in `/optimizer/`).
-  - Seed **~12 mock `pending` "Today's Shift Queue" requests** alongside any new judge-booked trips submitted via `/trips/` so live consolidation, HSE constraint enforcement, and DB persistence work immediately on `/optimizer/`.
+## 2. KJO Dataset Profile & Dual-Mode Data Strategy
+- **Source File (gitignored, bundled as `apps/core/fixtures/kjo_dataset.json.gz`):** `KJO_Marine_Fleet_Hackathon_Participant_Dataset.xlsx` (8 sheets: `START HERE`, `Theme_Brief`, `Idea_Starters`, `Vessels`, `Trips`, `Availability`, `Requests`, `Data_Dictionary`).
+- **Observed Schema & Metrics:**
+  - **`Vessels` (8 rows):** `Vessel_ID` (`CB-01`–`CB-08`), `Vessel_Type`, `Passenger_Capacity`, `Cargo_Capacity_T`, `Underway_Rate_Lph`, `Idle_Rate_Lph`, `Cruise_Speed_kn`, `Shift_Hours_per_Day` (12), `Status`.
+  - **`Trips` (976 rows) + `Requests` (976 rows, exact 1:1 join on `Trip_ID`):** Date range `2026-08-26` → `2026-11-23` (90 days). `Origin` (`Marine Base`), `Destination` (`Platform A/B/C`, `Offshore Terminal`, `Maintenance Area`), `Mission_Type` (`Passenger Transfer`, `Material Delivery`, `Maintenance Support`), `Departure_DT`, `Return_DT`, `Earliest_Departure_DT`, `Latest_Departure_DT`, `Underway_Hours`, `Onsite_Work_Hours`, `Nonproductive_Idle_Hours`, `Distance_nm`, `Passengers` (0–14), `Cargo_Tonnes` (0–6.72), `Weather` (`Calm`/`Moderate`/`Rough`), `Priority` (`Routine`/`Urgent`/`Critical`), `Flexible_Window` (`Yes`/`No`, 752 flexible), `Actual_Fuel_L`.
+  - **`Availability` (720 rows = 8 × 90 days):** `Available` (585), `Weather Restricted` (97), `Maintenance` (38).
+- **Key Edge Cases & Operating Rules Observed:**
+  - **15 blank `Actual_Fuel_L` rows:** Treated as `"missing"` telemetry logs rather than zero fuel.
+  - **Physics-based fuel anomalies:** Expected fuel = `(Underway_Hours × Underway_Rate_Lph) + ((Onsite_Work_Hours + Nonproductive_Idle_Hours) × Idle_Rate_Lph)`. Yields 22 severe high-burn outliers (`≥ 1.30×`, up to `2.07×` on `TR-00012 CB-08`) and 8 suspiciously low readings (`≤ 0.70×`). Per KJO guidance, alerts are framed as **engineering investigation flags** (never misconduct accusations).
+  - **Productive vs. Non-productive waiting:** `Onsite_Work_Hours` is productive offshore support; `Nonproductive_Idle_Hours` (572.6 h total) is avoidable idle fuel waste.
+  - **Consolidation potential:** 616 / 976 trips (63.1%) are under 50% max capacity, with ~168 mergeable same-day overlapping flexible pairs.
+  - **Standby vessel:** `CB-07` (54 historical trips vs 115–155 for peers) is seeded with an active `standby_lock` `SafetyOverride`.
+- **Dual-Mode Lifecycle:**
+  - `seed_fleet --if-empty` (auto-run in `entrypoint.sh` on Cloud Run startup) loads 8 `Vessel`s, 720 `VesselAvailability` rows, 976 `completed` historical `Trip`s, **12 mock `pending` shift queue `Trip`s** (`TR-QUEUE-01`–`12` with clean pairs, rough-weather pair, standby-locked pair, fixed critical run, and high-load run), and **1 active `standby_lock` on `CB-07`**.
 
 ---
 
-## 3. Draft Frozen Core Data Model (`apps/core/models.py` — Portable ORM Only)
-*(Confirm exact column names/types at 11:00 AM after dataset inspection, implement once in `apps/core/models.py`, commit `0001_initial.py` + idempotent `seed_fleet` command to `main`, and freeze. Use portable Django ORM fields only — no Postgres-only column types.)*
-
-- **`Vessel`**
-  - `name`, `vessel_type` (`crew` / `utility` / `multipurpose` / `standby`), `pax_capacity`, `cargo_capacity_tons`, `hourly_fuel_lph`, `daily_charter_kwd`, `is_standby`, `status`
-- **`Trip`**
-  - `vessel` (`ForeignKey`), `origin`, `destination`, `departure_time`, `duration_hours`, `pax_count`, `cargo_tons`, `fuel_liters`, `weather_state`, `status` (`completed` / `pending` / `consolidated` / `cancelled`), `dispatch_plan` (nullable `ForeignKey`), `notes`
-- **`DispatchPlan`**
-  - `name`, `baseline_trips`, `optimized_trips`, `trips_eliminated`, `fuel_liters_saved`, `kwd_saved`, `co2_kg_saved`, `plan_payload` (`JSONField`), `ai_briefing` (`JSONField`), `ai_fallback_used`, `is_approved`
-- **`SafetyOverride`**
-  - `rule_type` (`weather_hold` / `maintenance_hold` / `standby_lock`), `vessel` (nullable `ForeignKey`), `platform_or_zone`, `source_trip` (nullable `ForeignKey`), `reason`, `is_active`
+## 3. FROZEN Core Data Model (`apps/core/models.py` & `apps/core/constants.py`)
+Portable Django ORM fields only (SQLite + Cloud SQL PostgreSQL parity).
+- **`Vessel`**: `vessel_id` (unique), `vessel_type`, `passenger_capacity`, `cargo_capacity_t`, `underway_rate_lph`, `idle_rate_lph`, `cruise_speed_kn`, `shift_hours_per_day`, `hourly_operating_kwd`, `is_standby_designated`, `status`.
+- **`VesselAvailability`**: `vessel` (FK), `date`, `scheduled_shift_hours`, `maintenance_hours`, `weather_restricted_hours`, `availability_status`.
+- **`Trip`**: `trip_id` (unique), `request_id`, `vessel` (FK), `trip_date`, `mission_type`, `origin`, `destination`, `submitted_dt`, `earliest_departure_dt`, `latest_departure_dt`, `departure_dt`, `return_dt`, `underway_hours`, `onsite_work_hours`, `nonproductive_idle_hours`, `distance_nm`, `passengers`, `cargo_tonnes`, `weather`, `priority`, `flexible_window`, `actual_fuel_l` (nullable), `status` (`completed`/`pending`/`consolidated`/`cancelled`), `dispatch_plan` (nullable FK), `consolidated_into` (nullable self-FK), `is_synthetic_queue`, `notes`. Computed properties: `pax_utilization_pct`, `cargo_utilization_pct`, `utilization_pct`, `is_half_empty`, `expected_fuel_l`, `fuel_ratio`, `fuel_excess_l`, `idle_fuel_l`, `fuel_anomaly_status`.
+- **`DispatchPlan`**: `name`, `scope` (`pending`/`backtest`), `baseline_trips`, `optimized_trips`, `trips_eliminated`, `fuel_liters_saved`, `kwd_saved`, `co2_kg_saved`, `dispatcher_minutes_saved`, `plan_payload` (`JSONField`), `ai_briefing` (`JSONField`), `ai_fallback_used`, `is_approved`, `approved_at`.
+- **`SafetyOverride`**: `rule_type` (`weather_hold`/`maintenance_hold`/`standby_lock`), `vessel` (nullable FK), `destination`, `source_trip` (nullable FK), `severity`, `reason`, `created_by_role`, `is_active`.
+- **Shared AI Contracts (`apps/core/ai.py`):** `DispatchBriefing`, `MergeRiskAssessment` (`approve`/`review`/`hold`), and `ActionableDispatchBriefing`.
 
 ---
 
@@ -42,49 +45,47 @@
 - **Live DB Readouts:** Live KPI strip (Fleet Utilization %, Half-Empty Runs, Est. 90-Day KWD / Fuel / CO₂ Savings, Active HSE Holds), one Chart.js fleet utilization visual, and 3 clear action cards into Features 1–3.
 
 ### Feature 1 — Trip Ticketing & Utilization Ledger (`apps/trips/`, Salman)
-- **Goal:** Track utilization KPIs across all 976 historical trips and provide an HTMX trip booking form that saves new `pending` trip requests directly to PostgreSQL.
-- **Standalone & Testable:** Judges submit a new crew/cargo trip request -> saved to DB -> utilization rate and half-empty flag appear immediately, and the `pending` trip enters the live Optimizer queue.
+- **Goal:** Track utilization KPIs across all 976 historical trips (plus non-productive idle fuel vs. productive onsite support) and provide an HTMX trip booking form that saves new `pending` trip requests directly to PostgreSQL.
+- **Standalone & Testable:** Judges submit a new crew/cargo trip request -> saved to DB -> utilization bar and half-empty flag appear immediately, and the `pending` trip enters `/optimizer/`.
 
 ### Feature 2 — Dispatch Consolidation Optimizer (`apps/optimizer/`, Saleh)
-- **Goal:** Python solver consolidating `pending` shift trips within safe passenger (16–22), cargo (7–9 t), time-window, and active `SafetyOverride` HSE constraints, plus a 90-day historical backtest headline across the 976 completed trips.
-- **Standalone & Testable:** Judges click **Run Consolidation Solver** -> inspect trips eliminated, fuel liters saved, KWD saved, CO₂ reduced, and dispatcher hours saved -> click **Approve & Save Plan** to persist the consolidated schedule (`DispatchPlan`) to PostgreSQL.
+- **Goal:** Python solver consolidating `pending` shift trips within passenger/cargo/time-window (`flexible_window`, `[earliest_departure_dt, latest_departure_dt]`) and active `SafetyOverride` HSE constraints, plus a 90-day historical backtest headline across the 976 completed trips (~168 mergeable pairs).
+- **Standalone & Testable:** Judges click **Run Consolidation Solver** -> inspect Before → After diff cards, trips eliminated, fuel liters saved, KWD saved, CO₂ reduced, and dispatcher minutes saved -> click **Approve & Save Plan** to persist `DispatchPlan` (and update consolidated trips) in PostgreSQL.
 
 ### Bonus AI — Actionable Dispatch Co-Pilot (`apps/core/ai.py` + `apps/optimizer/`, Saleh)
-- **Embedded AI Work:** Calls `gemini-4-hydrogen` via the `google-genai` Interactions API + Pydantic structured JSON output (with a deterministic fallback if `GEMINI_API_KEY` is missing or times out).
+- **Embedded AI Work:** Calls `gemini-4-hydrogen` via the `google-genai` Interactions API using `ActionableDispatchBriefing` structured JSON output (with deterministic fallback if `GEMINI_API_KEY` is missing or times out).
 - **Visible App Impact (Required for Bonus Points):** Scores every proposed merge (`approve` / `review` / `hold` + risk badge + concise rationale), **automatically unchecks high-risk merges in the UI**, and saves the structured shift handover briefing inside `DispatchPlan` in PostgreSQL.
 
 ### Feature 3 — Safety & Fuel Anomaly Guard (`apps/safety/`, First Finisher)
-- **Goal:** Detect statistical fuel-burn outliers per vessel/class across the 976 trips (quantifying excess liters & KWD wasted) and enforce **3 live PostgreSQL `SafetyOverride` HSE rules** that directly constrain `/optimizer/` and feed into the Gemini Co-Pilot:
-  1. **Sea-State / Weather Hold** on a platform, zone, or fleet.
+- **Goal:** Detect physics-based fuel-burn outliers (`actual_fuel_l / expected_fuel_l >= 1.30` or `<= 0.70`, plus 15 missing logs) framed as engineering investigation flags across the 976 trips, and enforce **3 live PostgreSQL `SafetyOverride` HSE rules** constraining `/optimizer/` and Gemini:
+  1. **Sea-State / Weather Hold** on a destination/zone or Rough weather.
   2. **Vessel Maintenance Hold** (1-click trigger directly from any flagged fuel anomaly).
-  3. **Standby Vessel Protection Lock** preventing standby boats from being pulled into routine cargo/pax consolidation.
+  3. **Standby Vessel Protection Lock** (`CB-07` pre-locked; toggleable/manageable in DB).
 - **Standalone & Testable:** Judges inspect flagged fuel outliers, create/toggle an HSE hold saved to PostgreSQL, reload to verify persistence, and confirm `/optimizer/` respects the active safety block.
 
 ---
 
-## 5. Quantified Impact Formulas (Pillar 4 — Mock Benchmark Assumptions Clearly Labeled)
-All KWD, fuel, CO₂, and dispatcher-hour figures use transparent mock operational benchmarks documented in `README.md`:
-- **Trips Eliminated:** `baseline_trips - optimized_trips`
-- **Fuel Saved (Liters):** `sum(eliminated_trip_expected_fuel) - consolidation_detour_penalty`
-- **CO₂ Avoided (kg):** `fuel_liters_saved * ASSUMED_KG_CO2_PER_LITER` (benchmark: `2.68 kg CO₂/L`)
-- **Cost Saved (KWD):** `(fuel_liters_saved * ASSUMED_DIESEL_KWD_PER_LITER) + (vessel_hours_saved * ASSUMED_HOURLY_OPERATING_KWD)` (benchmark baseline e.g. `0.150 KWD/L` marine diesel + vessel hourly operating rate)
-- **Dispatcher Time Saved:** Estimated minutes saved per shift vs. manual spreadsheet matching.
+## 5. Quantified Impact Formulas (`apps/core/constants.py` — Mock Benchmarks Labeled)
+- `ASSUMED_DIESEL_KWD_PER_LITER = 0.150`
+- `ASSUMED_KG_CO2_PER_LITER = 2.68`
+- `DISPATCHER_MINUTES_SAVED_PER_MERGE = 15`
+- `CONSOLIDATION_DETOUR_FUEL_PENALTY_FACTOR = 0.08`
+- `VESSEL_HOURLY_OPERATING_KWD`: Crew Boat `42.0`, Utility Boat `55.0`, Multi-purpose Boat `62.0`
+- **Formulas:** `estimate_savings_kwd(fuel_liters_saved, vessel_hours_saved, hourly_operating_kwd)` and `estimate_co2_kg(fuel_liters_saved)`.
 
 ---
 
-## 6. 11:00 AM Kickoff & Parallel Execution Split (Salman vs. Saleh)
-- **11:00 – 11:15 (Salman):** Inspect organizer dataset with `python manage.py inspect_dataset <path>` (trigger synthetic fallback if delayed >15 min).
-- **11:15 – 11:40 (Salman):** Update Section 2 & 3 of this spec, run one focused Goldfish check, implement `apps/core/models.py` + `0001_initial.py` + idempotent `seed_fleet`, and merge **1 Schema PR** to `main`.
-- **11:40 – 14:30 (Parallel):**
+## 6. Parallel Sprint Plan (Post-Schema Freeze)
+- **Now (Parallel):**
   - **Salman (`feat/trips-*`):** Feature 1 (`/trips/`) + Executive Control Tower (`/`).
-  - **Saleh (`feat/optimizer-*`):** Feature 2 (`/optimizer/`) + Actionable Gemini Co-Pilot.
-- **14:30 – 15:30 (`feat/safety-*`):** Whoever finishes first implements Feature 3 (`/safety/`) and wires `SafetyOverride` into `/optimizer/` and the Gemini prompt.
-- **15:30 – 17:00:** Feature freeze at 15:30 -> end-to-end live Cloud Run smoke test -> finalize `README.md` with exact judge steps & mock-data disclaimer -> submit before 17:00.
+  - **Saleh (`feat/optimizer-*`):** Feature 2 (`/optimizer/`) + Actionable Gemini Co-Pilot (`ActionableDispatchBriefing`).
+- **14:30 – 15:30 (`feat/safety-*`):** First finisher builds Feature 3 (`/safety/`) and verifies `SafetyOverride` integration.
+- **15:30 – 17:00:** Feature freeze at 15:30 -> end-to-end live Cloud Run smoke test (`https://crudeinference.com`) -> finalize `README.md` with exact judge steps & mock-data disclaimer -> submit before 17:00.
 
 ---
 
 ## 7. Judging Live Test Script (End-to-End < 3 Minutes)
-1. Open `/` — Executive Control Tower loads immediately with zero login prompt, live PostgreSQL KPIs, and fleet utilization chart.
+1. Open `/` — Executive Control Tower loads immediately with zero login prompt, live PostgreSQL KPIs (from 976 KJO trips), and fleet utilization chart.
 2. Open `/trips/` -> submit a half-empty `pending` trip request -> reload page to verify PostgreSQL persistence and half-empty flag.
-3. Open `/safety/` -> inspect statistical fuel-burn anomalies -> click **Maintenance Hold** (or add a **Weather Hold** / **Standby Lock**) -> reload to verify persistence.
-4. Open `/optimizer/` -> run consolidation solver -> verify active HSE holds block unsafe merges -> click **AI Dispatch Co-Pilot** -> inspect per-merge risk badges, auto-unchecked high-risk merge, and handover brief -> click **Approve & Save Plan** -> reload to verify persisted `DispatchPlan`.
+3. Open `/safety/` -> inspect physics-based fuel anomalies (`TR-00012` 2.07×) -> click **Maintenance Hold** (or add a **Weather Hold**) -> reload to verify persistence.
+4. Open `/optimizer/` -> run consolidation solver -> verify `CB-07` standby lock & active HSE holds block unsafe merges -> click **Run AI Risk Review** -> inspect per-merge risk badges, auto-unchecked high-risk merge, and handover brief -> click **Approve & Save Plan** -> reload to verify persisted `DispatchPlan`.
