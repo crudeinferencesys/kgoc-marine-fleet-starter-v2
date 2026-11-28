@@ -1,0 +1,269 @@
+"""Domain telemetry, filtering, and ID generation services for Feature 1 (Trips & Utilization)."""
+
+from __future__ import annotations
+
+from collections import defaultdict
+from collections.abc import Mapping
+from typing import Any
+
+from django.core.paginator import Paginator
+from django.db.models import Count, Q
+
+from apps.core.constants import (
+    ASSUMED_DIESEL_KWD_PER_LITER,
+    ASSUMED_KG_CO2_PER_LITER,
+    HALF_EMPTY_THRESHOLD_PCT,
+)
+from apps.core.models import SafetyOverride, Trip, Vessel, VesselAvailability
+
+DESTINATION_DISTANCES_NM: dict[str, float] = {
+    "Platform A": 36.0,
+    "Platform B": 38.0,
+    "Platform C": 43.0,
+    "Offshore Terminal": 41.0,
+    "Maintenance Area": 31.0,
+}
+
+
+def get_trips_kpis() -> dict[str, Any]:
+    """Compute fleet utilization KPIs, per-vessel breakdown, and Chart.js data with zero N+1 queries."""
+    trips = list(
+        Trip.objects.select_related("vessel").filter(status__in=["completed", "pending"])
+    )
+    historical_trips = [trip for trip in trips if trip.status == "completed"]
+    pending_trips = [trip for trip in trips if trip.status == "pending"]
+
+    historical_count = len(historical_trips)
+    pending_count = len(pending_trips)
+    pending_half_empty_count = sum(
+        1 for trip in pending_trips if trip.utilization_pct < HALF_EMPTY_THRESHOLD_PCT
+    )
+
+    if historical_count > 0:
+        avg_utilization_pct = round(
+            sum(trip.utilization_pct for trip in historical_trips) / historical_count, 1
+        )
+        avg_pax_utilization_pct = round(
+            sum(trip.pax_utilization_pct for trip in historical_trips) / historical_count, 1
+        )
+        half_empty_count = sum(
+            1 for trip in historical_trips if trip.utilization_pct < HALF_EMPTY_THRESHOLD_PCT
+        )
+        half_empty_pct = round((half_empty_count / historical_count) * 100.0, 1)
+        productive_onsite_hours = round(
+            sum(trip.onsite_work_hours for trip in historical_trips), 1
+        )
+        avoidable_idle_hours = round(
+            sum(trip.nonproductive_idle_hours for trip in historical_trips), 1
+        )
+        idle_fuel_liters = round(sum(trip.idle_fuel_l for trip in historical_trips), 1)
+        idle_fuel_kwd = round(idle_fuel_liters * ASSUMED_DIESEL_KWD_PER_LITER, 2)
+        idle_co2_tonnes = round((idle_fuel_liters * ASSUMED_KG_CO2_PER_LITER) / 1000.0, 2)
+    else:
+        avg_utilization_pct = 0.0
+        avg_pax_utilization_pct = 0.0
+        half_empty_count = 0
+        half_empty_pct = 0.0
+        productive_onsite_hours = 0.0
+        avoidable_idle_hours = 0.0
+        idle_fuel_liters = 0.0
+        idle_fuel_kwd = 0.0
+        idle_co2_tonnes = 0.0
+
+    trips_by_vessel: dict[int, list[Trip]] = defaultdict(list)
+    for trip in historical_trips:
+        trips_by_vessel[trip.vessel_id].append(trip)
+
+    avail_by_vessel = {
+        row["vessel_id"]: row
+        for row in VesselAvailability.objects.values("vessel_id").annotate(
+            maintenance_days=Count("id", filter=Q(availability_status="Maintenance")),
+            weather_restricted_days=Count(
+                "id", filter=Q(availability_status="Weather Restricted")
+            ),
+        )
+    }
+    overrides_by_vessel = {
+        row["vessel_id"]: row["cnt"]
+        for row in SafetyOverride.objects.filter(is_active=True, vessel__isnull=False)
+        .values("vessel_id")
+        .annotate(cnt=Count("id"))
+    }
+
+    vessel_breakdown: list[dict[str, Any]] = []
+    for vessel in Vessel.objects.order_by("vessel_id"):
+        v_trips = trips_by_vessel.get(vessel.pk, [])
+        v_count = len(v_trips)
+        if v_count > 0:
+            v_avg_util = round(sum(t.utilization_pct for t in v_trips) / v_count, 1)
+            v_half_empty = sum(
+                1 for t in v_trips if t.utilization_pct < HALF_EMPTY_THRESHOLD_PCT
+            )
+            v_half_empty_pct = round((v_half_empty / v_count) * 100.0, 1)
+        else:
+            v_avg_util = 0.0
+            v_half_empty_pct = 0.0
+
+        avail_row = avail_by_vessel.get(vessel.pk, {})
+        vessel_breakdown.append(
+            {
+                "vessel_id": vessel.vessel_id,
+                "vessel_type": vessel.vessel_type,
+                "passenger_capacity": vessel.passenger_capacity,
+                "cargo_capacity_t": vessel.cargo_capacity_t,
+                "trip_count": v_count,
+                "avg_util_pct": v_avg_util,
+                "half_empty_pct": v_half_empty_pct,
+                "maintenance_days": avail_row.get("maintenance_days", 0),
+                "weather_restricted_days": avail_row.get("weather_restricted_days", 0),
+                "is_standby_designated": vessel.is_standby_designated,
+                "active_override_count": overrides_by_vessel.get(vessel.pk, 0),
+            }
+        )
+
+    vessel_chart_data = {
+        "labels": [row["vessel_id"] for row in vessel_breakdown],
+        "avg_util": [row["avg_util_pct"] for row in vessel_breakdown],
+        "half_empty_pct": [row["half_empty_pct"] for row in vessel_breakdown],
+    }
+
+    return {
+        "historical_count": historical_count,
+        "pending_count": pending_count,
+        "pending_half_empty_count": pending_half_empty_count,
+        "avg_utilization_pct": avg_utilization_pct,
+        "avg_pax_utilization_pct": avg_pax_utilization_pct,
+        "half_empty_count": half_empty_count,
+        "half_empty_pct": half_empty_pct,
+        "productive_onsite_hours": productive_onsite_hours,
+        "avoidable_idle_hours": avoidable_idle_hours,
+        "idle_fuel_liters": idle_fuel_liters,
+        "idle_fuel_kwd": idle_fuel_kwd,
+        "idle_co2_tonnes": idle_co2_tonnes,
+        "vessel_breakdown": vessel_breakdown,
+        "vessel_chart_data": vessel_chart_data,
+    }
+
+
+def get_vessels_meta() -> dict[str, dict[str, Any]]:
+    """Return vessel capacity specs and active HSE overrides keyed by string primary key."""
+    overrides_by_vessel: dict[int, list[dict[str, str]]] = defaultdict(list)
+    for ov in SafetyOverride.objects.filter(is_active=True, vessel__isnull=False).order_by(
+        "-created_at"
+    ):
+        overrides_by_vessel[ov.vessel_id].append(
+            {
+                "rule_type": ov.rule_type,
+                "rule_label": ov.get_rule_type_display(),
+                "severity": ov.severity,
+                "reason": ov.reason,
+            }
+        )
+
+    return {
+        str(vessel.pk): {
+            "vessel_id": vessel.vessel_id,
+            "vessel_type": vessel.vessel_type,
+            "passenger_capacity": vessel.passenger_capacity,
+            "cargo_capacity_t": vessel.cargo_capacity_t,
+            "cruise_speed_kn": vessel.cruise_speed_kn,
+            "is_standby_designated": vessel.is_standby_designated,
+            "active_overrides": overrides_by_vessel.get(vessel.pk, []),
+        }
+        for vessel in Vessel.objects.order_by("vessel_id")
+    }
+
+
+def filter_trips(params: Mapping[str, Any]) -> dict[str, Any]:
+    """Filter and paginate trips with pending shift rows prioritized ahead of historical sailings."""
+    raw_status = str(params.get("status") or "all").strip().lower()
+    valid_statuses = {"all", "pending", "completed", "consolidated", "cancelled"}
+    status = raw_status if raw_status in valid_statuses else "all"
+
+    vessel = str(params.get("vessel") or "").strip()
+    destination = str(params.get("destination") or "").strip()
+    half_empty = str(params.get("half_empty") or "").strip()
+    q = str(params.get("q") or "").strip()
+    page_num = params.get("page") or 1
+
+    counts_agg = Trip.objects.aggregate(
+        all_count=Count("id", filter=~Q(status="cancelled")),
+        pending_count=Count("id", filter=Q(status="pending")),
+        completed_count=Count("id", filter=Q(status="completed")),
+    )
+    status_counts = {
+        "all": counts_agg["all_count"],
+        "pending": counts_agg["pending_count"],
+        "completed": counts_agg["completed_count"],
+    }
+
+    qs = Trip.objects.select_related("vessel")
+    if status == "all":
+        qs = qs.exclude(status="cancelled")
+    else:
+        qs = qs.filter(status=status)
+
+    if vessel:
+        qs = qs.filter(vessel__vessel_id=vessel)
+    if destination:
+        qs = qs.filter(destination=destination)
+    if q:
+        qs = qs.filter(
+            Q(trip_id__icontains=q) | Q(request_id__icontains=q) | Q(notes__icontains=q)
+        )
+
+    trips = list(qs)
+    if half_empty == "1":
+        trips = [trip for trip in trips if trip.is_half_empty]
+
+    # Pending queue rows always appear before historical rows; within pending, newest created first.
+    trips.sort(
+        key=lambda t: (
+            0 if t.status == "pending" else 1,
+            -t.created_at.timestamp() if t.status == "pending" else 0.0,
+            -t.departure_dt.timestamp(),
+            -(t.pk or 0),
+        )
+    )
+
+    paginator = Paginator(trips, 25)
+    page_obj = paginator.get_page(page_num)
+
+    return {
+        "page_obj": page_obj,
+        "total_filtered_count": len(trips),
+        "status_counts": status_counts,
+        "filters": {
+            "status": status,
+            "vessel": vessel,
+            "destination": destination,
+            "half_empty": half_empty,
+            "q": q,
+        },
+    }
+
+
+def generate_live_trip_ids() -> tuple[str, str]:
+    """Generate the next unique ('TR-LIVE-NNN', 'REQ-LIVE-NNN') identifier pair."""
+    existing_trip_ids = set(
+        Trip.objects.filter(trip_id__startswith="TR-LIVE-").values_list("trip_id", flat=True)
+    )
+    existing_req_ids = set(
+        Trip.objects.filter(request_id__startswith="REQ-LIVE-").values_list(
+            "request_id", flat=True
+        )
+    )
+
+    max_num = 0
+    for code in existing_trip_ids | existing_req_ids:
+        suffix = code.rsplit("-", 1)[-1]
+        if suffix.isdigit():
+            max_num = max(max_num, int(suffix))
+
+    next_num = max_num + 1
+    while True:
+        trip_id = f"TR-LIVE-{next_num:03d}"
+        request_id = f"REQ-LIVE-{next_num:03d}"
+        if trip_id not in existing_trip_ids and request_id not in existing_req_ids:
+            return trip_id, request_id
+        next_num += 1

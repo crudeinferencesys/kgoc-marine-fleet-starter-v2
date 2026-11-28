@@ -4,6 +4,7 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 
 from .ai import is_ai_configured
+from .services import get_control_tower_metrics
 
 
 def _database_engine_label() -> str:
@@ -16,35 +17,12 @@ def _database_engine_label() -> str:
 
 
 def home(request: HttpRequest) -> HttpResponse:
-    """Render the system readiness overview and feature slice hub."""
+    """Render the Executive Control Tower with live fleet KPIs and slice launch cards."""
     context = {
+        "metrics": get_control_tower_metrics(),
         "db_engine": _database_engine_label(),
         "ai_configured": is_ai_configured(),
         "gemini_model": settings.GEMINI_MODEL,
-        "debug_mode": settings.DEBUG,
-        "slices": [
-            {
-                "name": "1. Trips & Utilization",
-                "owner": "Teammate A",
-                "url_name": "trips:index",
-                "path": "apps/trips/",
-                "summary": "Ingest fleet trips, log new trip requests to DB, and flag half-empty runs.",
-            },
-            {
-                "name": "2. Dispatch Optimizer",
-                "owner": "Teammate B",
-                "url_name": "optimizer:index",
-                "path": "apps/optimizer/",
-                "summary": "Python consolidation solver + KWD/fuel savings + AI Dispatch Co-Pilot.",
-            },
-            {
-                "name": "3. Safety & Fuel",
-                "owner": "Shared / Coordinate",
-                "url_name": "safety:index",
-                "path": "apps/safety/",
-                "summary": "Fuel-burn anomaly detection + weather/standby constraint overrides.",
-            },
-        ],
     }
     return render(request, "core/home.html", context)
 

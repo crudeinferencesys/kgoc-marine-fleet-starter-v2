@@ -313,3 +313,26 @@ class CoreSmokeTests(TestCase):
         brief = ActionableDispatchBriefing.model_validate(payload)
         self.assertEqual(len(brief.merge_assessments), 2)
         self.assertEqual(brief.merge_assessments[1].verdict, "hold")
+
+    def test_control_tower_renders_live_seeded_kpis_without_starter_copy(self):
+        call_command("seed_fleet", if_empty=True, stdout=io.StringIO())
+        response = self.client.get(reverse("core:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Teammate A")
+        self.assertContains(response, "Control Tower")
+        self.assertContains(response, "976")
+        self.assertContains(response, "control-tower-vessel-chart")
+
+    def test_copilot_4th_feature_route_and_navigation(self):
+        home_response = self.client.get(reverse("core:home"))
+        self.assertEqual(home_response.status_code, 200)
+        self.assertContains(home_response, reverse("core:copilot:index"))
+        self.assertContains(home_response, "04 · AI")
+
+        copilot_response = self.client.get(reverse("core:copilot:index"))
+        self.assertEqual(copilot_response.status_code, 200)
+        self.assertContains(copilot_response, "AI Dispatch Co-Pilot")
+
+        ping_response = self.client.post(reverse("core:copilot:ping"))
+        self.assertEqual(ping_response.status_code, 200)
+        self.assertContains(ping_response, "HTMX POST + CSRF verified")

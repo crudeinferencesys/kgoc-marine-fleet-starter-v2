@@ -50,18 +50,20 @@ Portable Django ORM fields only (SQLite + Cloud SQL PostgreSQL parity).
 
 ### Feature 2 — Dispatch Consolidation Optimizer (`apps/optimizer/`, Saleh)
 - **Goal:** Python solver consolidating `pending` shift trips within passenger/cargo/time-window (`flexible_window`, `[earliest_departure_dt, latest_departure_dt]`) and active `SafetyOverride` HSE constraints, plus a 90-day historical backtest headline across the 976 completed trips (~168 mergeable pairs).
-- **Standalone & Testable:** Judges click **Run Consolidation Solver** -> inspect Before → After diff cards, trips eliminated, fuel liters saved, KWD saved, CO₂ reduced, and dispatcher minutes saved -> click **Approve & Save Plan** to persist `DispatchPlan` (and update consolidated trips) in PostgreSQL.
-
-### Bonus AI — Actionable Dispatch Co-Pilot (`apps/core/ai.py` + `apps/optimizer/`, Saleh)
-- **Embedded AI Work:** Calls `gemini-4-hydrogen` via the `google-genai` Interactions API using `ActionableDispatchBriefing` structured JSON output (with deterministic fallback if `GEMINI_API_KEY` is missing or times out).
-- **Visible App Impact (Required for Bonus Points):** Scores every proposed merge (`approve` / `review` / `hold` + risk badge + concise rationale), **automatically unchecks high-risk merges in the UI**, and saves the structured shift handover briefing inside `DispatchPlan` in PostgreSQL.
+- **Standalone & Testable:** Judges click **Run Consolidation Solver** -> inspect Before → After diff cards, trips eliminated, fuel liters saved, KWD saved, CO₂ reduced, and dispatcher minutes saved -> click **Approve & Save Plan** to persist `DispatchPlan` (and update consolidated trips) in PostgreSQL. Links cleanly to the standalone 4th AI feature (`/copilot/`).
 
 ### Feature 3 — Safety & Fuel Anomaly Guard (`apps/safety/`, First Finisher)
-- **Goal:** Detect physics-based fuel-burn outliers (`actual_fuel_l / expected_fuel_l >= 1.30` or `<= 0.70`, plus 15 missing logs) framed as engineering investigation flags across the 976 trips, and enforce **3 live PostgreSQL `SafetyOverride` HSE rules** constraining `/optimizer/` and Gemini:
+- **Goal:** Detect physics-based fuel-burn outliers (`actual_fuel_l / expected_fuel_l >= 1.30` or `<= 0.70`, plus 15 missing logs) framed as engineering investigation flags across the 976 trips, and enforce **3 live PostgreSQL `SafetyOverride` HSE rules** constraining `/optimizer/` and `/copilot/`:
   1. **Sea-State / Weather Hold** on a destination/zone or Rough weather.
   2. **Vessel Maintenance Hold** (1-click trigger directly from any flagged fuel anomaly).
   3. **Standby Vessel Protection Lock** (`CB-07` pre-locked; toggleable/manageable in DB).
 - **Standalone & Testable:** Judges inspect flagged fuel outliers, create/toggle an HSE hold saved to PostgreSQL, reload to verify persistence, and confirm `/optimizer/` respects the active safety block.
+
+### Feature 4 (Standalone Bonus AI) — AI Dispatch Co-Pilot (`/copilot/`, `core:copilot:index`, Saleh)
+- **Owned Files:** `apps/optimizer/copilot_urls.py`, `apps/optimizer/copilot_views.py`, `templates/optimizer/copilot.html` (implemented by Saleh right after Feature 2 `/optimizer/`).
+- **Behaves Like a Standalone 4th Feature:** Dedicated sidebar entry (`04 · AI`), dedicated Control Tower launch card, and independent `/copilot/` URL with clear **Input → Output** + PostgreSQL persistence.
+- **Inputs:** Supervisor shift directive or KJO scenario + live `pending` queue, active `SafetyOverride` rules, and fuel anomaly alerts from PostgreSQL.
+- **Embedded AI Work & Outputs:** Calls `gemini-4-hydrogen` via the `google-genai` Interactions API using `ActionableDispatchBriefing` structured JSON output (with deterministic fallback if `GEMINI_API_KEY` is missing or times out). Scores each proposed merge (`approve` / `review` / `hold` + risk badge + rationale), enables 1-click HSE hold creation (`SafetyOverride`) and persisted shift handover briefings (`DispatchPlan`) in PostgreSQL.
 
 ---
 
@@ -88,4 +90,5 @@ Portable Django ORM fields only (SQLite + Cloud SQL PostgreSQL parity).
 1. Open `/` — Executive Control Tower loads immediately with zero login prompt, live PostgreSQL KPIs (from 976 KJO trips), and fleet utilization chart.
 2. Open `/trips/` -> submit a half-empty `pending` trip request -> reload page to verify PostgreSQL persistence and half-empty flag.
 3. Open `/safety/` -> inspect physics-based fuel anomalies (`TR-00012` 2.07×) -> click **Maintenance Hold** (or add a **Weather Hold**) -> reload to verify persistence.
-4. Open `/optimizer/` -> run consolidation solver -> verify `CB-07` standby lock & active HSE holds block unsafe merges -> click **Run AI Risk Review** -> inspect per-merge risk badges, auto-unchecked high-risk merge, and handover brief -> click **Approve & Save Plan** -> reload to verify persisted `DispatchPlan`.
+4. Open `/optimizer/` -> run consolidation solver -> verify `CB-07` standby lock & active HSE holds block unsafe merges -> click **Approve & Save Plan** -> reload to verify persisted `DispatchPlan`.
+5. Open `/copilot/` -> enter a shift directive or run Gemini 4 Dispatch Co-Pilot review -> inspect per-merge `Approve`/`Review`/`Hold` risk verdicts, apply an AI-recommended HSE hold, and save the shift handover briefing to PostgreSQL.
