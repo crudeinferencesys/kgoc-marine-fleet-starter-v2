@@ -6,6 +6,7 @@ from collections import defaultdict
 
 from apps.core.constants import (
     CONSOLIDATION_DETOUR_FUEL_PENALTY_FACTOR,
+    DESTINATIONS,
     estimate_co2_kg,
     estimate_savings_kwd,
 )
@@ -34,6 +35,11 @@ def get_control_tower_metrics() -> dict:
     severe_fuel_anomalies_count = 0
     low_fuel_anomalies_count = 0
     missing_fuel_logs_count = 0
+    normal_fuel_count = 0
+
+    dest_healthy: dict[str, int] = defaultdict(int)
+    dest_half_empty: dict[str, int] = defaultdict(int)
+    dest_idle_fuel: dict[str, float] = defaultdict(float)
 
     trips_by_vessel: dict[int, list[Trip]] = defaultdict(list)
     flexible_groups: dict[tuple, list[Trip]] = defaultdict(list)
@@ -44,10 +50,14 @@ def get_control_tower_metrics() -> dict:
         pax_util_sum += trip.pax_utilization_pct
         if trip.is_half_empty:
             half_empty_count += 1
+            dest_half_empty[trip.destination] += 1
+        else:
+            dest_healthy[trip.destination] += 1
 
         productive_onsite_hours += trip.onsite_work_hours
         avoidable_idle_hours += trip.nonproductive_idle_hours
         idle_fuel_liters += trip.idle_fuel_l
+        dest_idle_fuel[trip.destination] += trip.idle_fuel_l
 
         anomaly_status = trip.fuel_anomaly_status
         if anomaly_status == "high":
@@ -56,6 +66,8 @@ def get_control_tower_metrics() -> dict:
             low_fuel_anomalies_count += 1
         elif anomaly_status == "missing":
             missing_fuel_logs_count += 1
+        else:
+            normal_fuel_count += 1
 
         if trip.flexible_window:
             flexible_groups[(trip.trip_date, trip.destination)].append(trip)
@@ -94,8 +106,10 @@ def get_control_tower_metrics() -> dict:
     backtest_trips_eliminated = 0
     backtest_fuel_saved_l = 0.0
     backtest_hours_saved = 0.0
+    dest_merge_fuel: dict[str, float] = defaultdict(float)
+    dest_merges: dict[str, int] = defaultdict(int)
 
-    for group_trips in flexible_groups.values():
+    for (_, destination), group_trips in flexible_groups.items():
         if len(group_trips) < 2:
             continue
         group_trips.sort(
@@ -124,11 +138,14 @@ def get_control_tower_metrics() -> dict:
                 ):
                     used[i] = True
                     used[j] = True
-                    backtest_trips_eliminated += 1
-                    backtest_fuel_saved_l += b.expected_fuel_l * (
+                    saved_fuel = b.expected_fuel_l * (
                         1.0 - CONSOLIDATION_DETOUR_FUEL_PENALTY_FACTOR
                     )
+                    backtest_trips_eliminated += 1
+                    backtest_fuel_saved_l += saved_fuel
                     backtest_hours_saved += b.underway_hours + b.nonproductive_idle_hours
+                    dest_merge_fuel[destination] += saved_fuel
+                    dest_merges[destination] += 1
                     break
 
     backtest_fuel_saved_l = round(backtest_fuel_saved_l, 1)
@@ -184,11 +201,32 @@ def get_control_tower_metrics() -> dict:
         "severe_fuel_anomalies_count": severe_fuel_anomalies_count,
         "low_fuel_anomalies_count": low_fuel_anomalies_count,
         "missing_fuel_logs_count": missing_fuel_logs_count,
+        "normal_fuel_count": normal_fuel_count,
         "approved_plans_count": approved_plans_count,
         "vessel_chart_data": {
             "labels": chart_labels,
             "avg_util": chart_avg_util,
             "half_empty_pct": chart_half_empty_pct,
             "trip_counts": chart_trip_counts,
+        },
+        "destination_chart_data": {
+            "labels": list(DESTINATIONS),
+            "healthy_counts": [dest_healthy[d] for d in DESTINATIONS],
+            "half_empty_counts": [dest_half_empty[d] for d in DESTINATIONS],
+        },
+        "savings_chart_data": {
+            "labels": list(DESTINATIONS),
+            "merge_fuel_l": [round(dest_merge_fuel[d], 1) for d in DESTINATIONS],
+            "idle_fuel_l": [round(dest_idle_fuel[d], 1) for d in DESTINATIONS],
+            "merges": [dest_merges[d] for d in DESTINATIONS],
+        },
+        "fuel_health_chart_data": {
+            "labels": ["Normal", "High Outlier (>=1.3x)", "Low Burn (<=0.7x)", "Missing Log"],
+            "counts": [
+                normal_fuel_count,
+                severe_fuel_anomalies_count,
+                low_fuel_anomalies_count,
+                missing_fuel_logs_count,
+            ],
         },
     }
