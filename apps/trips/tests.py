@@ -317,10 +317,62 @@ class TripsViewIntegrationTests(TestCase):
         self.assertContains(response, "Rough Weather")
         self.assertContains(response, 'id="trip-inspector-drawer"')
         self.assertContains(response, 'id="booking-drawer"')
-        self.assertContains(response, "Advanced Filters")
+        self.assertContains(response, "More Filters")
+        self.assertContains(response, 'id="trips-more-filters-modal"')
+        self.assertContains(response, "Route &amp; Area")
+        self.assertContains(response, "Fleet &amp; Crew")
+        self.assertContains(response, "Sea State &amp; Fuel Audit")
         self.assertContains(response, "Export CSV")
         self.assertContains(response, "Trip Ledger")
         self.assertContains(response, "Fleet Analytics")
+
+    def test_categorized_more_filters_and_csv_export(self):
+        # Route & Area filters
+        route_res = filter_trips({"mission_type": "Material Delivery", "flexible_window": "1"})
+        self.assertGreater(route_res["total_filtered_count"], 0)
+        self.assertTrue(
+            all(
+                t.mission_type == "Material Delivery" and t.flexible_window
+                for t in route_res["page_obj"]
+            )
+        )
+
+        # Fleet & Crew filters
+        crew_res = filter_trips(
+            {"vessel_type": "Utility Boat", "min_cargo": "2.0", "load_band": "over_70"}
+        )
+        self.assertGreater(crew_res["total_filtered_count"], 0)
+        self.assertTrue(
+            all(
+                t.vessel.vessel_type == "Utility Boat"
+                and t.cargo_tonnes >= 2.0
+                and t.utilization_pct >= 70.0
+                for t in crew_res["page_obj"]
+            )
+        )
+
+        pax_res = filter_trips({"min_pax": "10"})
+        self.assertGreater(pax_res["total_filtered_count"], 0)
+        self.assertTrue(all(t.passengers >= 10 for t in pax_res["page_obj"]))
+
+        # Sea State & Fuel Audit filters
+        audit_res = filter_trips({"priority": "Urgent", "idle_only": "1"})
+        self.assertGreater(audit_res["total_filtered_count"], 0)
+        self.assertTrue(
+            all(
+                t.priority == "Urgent" and t.nonproductive_idle_hours >= 0.75
+                for t in audit_res["page_obj"]
+            )
+        )
+
+        csv_response = self.client.get(
+            reverse("trips:export_csv"),
+            data={"vessel_type": "Utility Boat", "min_cargo": "2.0"},
+        )
+        self.assertEqual(csv_response.status_code, 200)
+        body = csv_response.content.decode("utf-8")
+        self.assertIn("Utility Boat", body)
+        self.assertNotIn("Crew Boat", body)
 
     def test_zero_scroll_pagination_and_filtered_csv_export(self):
         default_page = self.client.get(reverse("trips:index"))

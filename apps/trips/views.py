@@ -12,7 +12,13 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from apps.core.constants import DESTINATIONS, WEATHER_STATES
+from apps.core.constants import (
+    DESTINATIONS,
+    MISSION_TYPES,
+    PRIORITIES,
+    VESSEL_TYPES,
+    WEATHER_STATES,
+)
 from apps.core.models import SafetyOverride, Trip, Vessel
 from apps.trips.forms import TripBookingForm
 from apps.trips.services import filter_trips, get_trips_kpis, get_vessels_meta
@@ -49,10 +55,14 @@ def _build_trips_context(
         "per_page_choices": [8, 15, 25],
         "status_counts": ledger["status_counts"],
         "preset_counts": ledger["preset_counts"],
+        "advanced_filter_count": ledger["advanced_filter_count"],
         "filters": ledger["filters"],
         "vessels": list(Vessel.objects.order_by("vessel_id")),
+        "vessel_types": list(VESSEL_TYPES),
         "destinations": list(DESTINATIONS),
+        "mission_types": list(MISSION_TYPES),
         "weather_states": list(WEATHER_STATES),
+        "priorities": list(PRIORITIES),
         "cancel_notice": cancel_notice,
     }
 

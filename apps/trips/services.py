@@ -13,6 +13,9 @@ from apps.core.constants import (
     ASSUMED_DIESEL_KWD_PER_LITER,
     ASSUMED_KG_CO2_PER_LITER,
     HALF_EMPTY_THRESHOLD_PCT,
+    MISSION_TYPES,
+    PRIORITIES,
+    VESSEL_TYPES,
 )
 from apps.core.models import SafetyOverride, Trip, Vessel, VesselAvailability
 
@@ -181,12 +184,41 @@ def filter_trips(params: Mapping[str, Any], *, default_per_page: int = 25) -> di
     status = raw_status if raw_status in valid_statuses else "all"
 
     vessel = str(params.get("vessel") or "").strip()
+    raw_vessel_type = str(params.get("vessel_type") or "").strip()
+    vessel_type = raw_vessel_type if raw_vessel_type in VESSEL_TYPES else ""
     destination = str(params.get("destination") or "").strip()
+    raw_mission = str(params.get("mission_type") or "").strip()
+    mission_type = raw_mission if raw_mission in MISSION_TYPES else ""
+    raw_flex = str(params.get("flexible_window") or "").strip()
+    flexible_window = raw_flex if raw_flex in {"1", "0"} else ""
+
+    raw_min_pax = str(params.get("min_pax") or "").strip()
+    min_pax: int | None = int(raw_min_pax) if raw_min_pax.isdigit() else None
+    raw_min_cargo = str(params.get("min_cargo") or "").strip()
+    min_cargo: float | None = None
+    if raw_min_cargo:
+        try:
+            parsed_cargo = float(raw_min_cargo)
+            if parsed_cargo >= 0:
+                min_cargo = parsed_cargo
+        except ValueError:
+            min_cargo = None
+
     half_empty = str(params.get("half_empty") or "").strip()
+    raw_load_band = str(params.get("load_band") or "").strip().lower()
+    load_band = (
+        raw_load_band if raw_load_band in {"under_50", "50_70", "over_70"} else ""
+    )
+
     raw_anomaly = str(params.get("anomaly") or "").strip().lower()
-    anomaly = raw_anomaly if raw_anomaly in {"high", "low", "missing"} else ""
+    anomaly = (
+        raw_anomaly if raw_anomaly in {"high", "low", "missing", "normal"} else ""
+    )
     raw_weather = str(params.get("weather") or "").strip()
     weather = raw_weather if raw_weather in {"Calm", "Moderate", "Rough"} else ""
+    raw_priority = str(params.get("priority") or "").strip()
+    priority = raw_priority if raw_priority in PRIORITIES else ""
+    idle_only = "1" if str(params.get("idle_only") or "").strip() == "1" else ""
     q = str(params.get("q") or "").strip()
     page_num = params.get("page") or 1
 
@@ -224,10 +256,26 @@ def filter_trips(params: Mapping[str, Any], *, default_per_page: int = 25) -> di
 
     if vessel:
         qs = qs.filter(vessel__vessel_id=vessel)
+    if vessel_type:
+        qs = qs.filter(vessel__vessel_type=vessel_type)
     if destination:
         qs = qs.filter(destination=destination)
+    if mission_type:
+        qs = qs.filter(mission_type=mission_type)
+    if flexible_window == "1":
+        qs = qs.filter(flexible_window=True)
+    elif flexible_window == "0":
+        qs = qs.filter(flexible_window=False)
+    if min_pax is not None:
+        qs = qs.filter(passengers__gte=min_pax)
+    if min_cargo is not None:
+        qs = qs.filter(cargo_tonnes__gte=min_cargo)
     if weather:
         qs = qs.filter(weather=weather)
+    if priority:
+        qs = qs.filter(priority=priority)
+    if idle_only == "1":
+        qs = qs.filter(nonproductive_idle_hours__gte=0.75)
     if q:
         qs = qs.filter(
             Q(trip_id__icontains=q) | Q(request_id__icontains=q) | Q(notes__icontains=q)
@@ -236,6 +284,12 @@ def filter_trips(params: Mapping[str, Any], *, default_per_page: int = 25) -> di
     trips = list(qs)
     if half_empty == "1":
         trips = [trip for trip in trips if trip.is_half_empty]
+    if load_band == "under_50":
+        trips = [trip for trip in trips if trip.utilization_pct < 50.0]
+    elif load_band == "50_70":
+        trips = [trip for trip in trips if 50.0 <= trip.utilization_pct < 70.0]
+    elif load_band == "over_70":
+        trips = [trip for trip in trips if trip.utilization_pct >= 70.0]
     if anomaly:
         trips = [trip for trip in trips if trip.fuel_anomaly_status == anomaly]
 
@@ -257,6 +311,28 @@ def filter_trips(params: Mapping[str, Any], *, default_per_page: int = 25) -> di
     paginator = Paginator(trips, per_page)
     page_obj = paginator.get_page(page_num)
 
+    min_pax_str = str(min_pax) if min_pax is not None else ""
+    min_cargo_str = f"{min_cargo:g}" if min_cargo is not None else ""
+    advanced_filter_count = sum(
+        1
+        for active in (
+            status != "all",
+            bool(destination),
+            bool(mission_type),
+            bool(flexible_window),
+            bool(vessel),
+            bool(vessel_type),
+            bool(min_pax_str),
+            bool(min_cargo_str),
+            bool(load_band),
+            bool(weather),
+            bool(priority),
+            bool(anomaly),
+            idle_only == "1",
+        )
+        if active
+    )
+
     return {
         "page_obj": page_obj,
         "filtered_trips": trips,
@@ -264,13 +340,22 @@ def filter_trips(params: Mapping[str, Any], *, default_per_page: int = 25) -> di
         "per_page": per_page,
         "status_counts": status_counts,
         "preset_counts": preset_counts,
+        "advanced_filter_count": advanced_filter_count,
         "filters": {
             "status": status,
             "vessel": vessel,
+            "vessel_type": vessel_type,
             "destination": destination,
+            "mission_type": mission_type,
+            "flexible_window": flexible_window,
+            "min_pax": min_pax_str,
+            "min_cargo": min_cargo_str,
             "half_empty": half_empty,
+            "load_band": load_band,
             "anomaly": anomaly,
             "weather": weather,
+            "priority": priority,
+            "idle_only": idle_only,
             "q": q,
             "per_page": per_page,
         },
