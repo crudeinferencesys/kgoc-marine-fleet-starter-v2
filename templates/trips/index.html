@@ -4,14 +4,7 @@
 
 {% block topbar_title %}Trips &amp; Utilization Ledger{% endblock %}
 
-{% block topbar_actions %}
-<a href="{% url 'optimizer:index' %}" class="btn btn-primary btn-xs gap-1">
-  Dispatch Optimizer
-  <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
-  </svg>
-</a>
-{% endblock %}
+{% block topbar_actions %}{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -69,9 +62,6 @@
          if (tab === 'book') {
            this.inspectorOpen = false;
          }
-         if (tab === 'analytics') {
-           this.$nextTick(() => window.dispatchEvent(new CustomEvent('trips-analytics:shown')));
-         }
        }
      }"
      @trip-inspector:open.window="inspectorOpen = true"
@@ -80,11 +70,10 @@
      @trip-booking:close.window="switchTab('ledger')"
      @trips-tab:ledger.window="switchTab('ledger')"
      @keydown.escape.window="inspectorOpen = false">
-{{ kpis.vessel_chart_data|json_script:"trips-vessel-chart-data" }}
 {{ vessels_meta|json_script:"vessels-meta-data" }}
 
-<!-- Band 1: Compact Single-Row Operational Header + Workspace Tabs -->
-<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+<!-- Band 1: Compact Single-Row Operational Header + 2-Tab Workspace Switcher -->
+<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2.5 mb-2.5">
   <div class="flex flex-wrap items-center gap-2.5">
     <h1 class="text-xl font-bold tracking-tight text-slate-900">
       Trips &amp; Utilization
@@ -94,7 +83,7 @@
     </span>
   </div>
 
-  <!-- Zero-Scroll Workspace Switcher -->
+  <!-- Zero-Scroll Workspace Switcher (2 Tabs) -->
   <div class="inline-flex items-center rounded-lg bg-slate-200/70 p-1 self-start md:self-auto" role="tablist" aria-label="Trips workspace views">
     <button type="button"
             role="tab"
@@ -103,14 +92,6 @@
             :class="activeTab === 'ledger' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
             class="px-3 py-1 rounded-md text-xs font-semibold transition-all">
       Trip Ledger
-    </button>
-    <button type="button"
-            role="tab"
-            :aria-selected="(activeTab === 'analytics').toString()"
-            @click="switchTab('analytics')"
-            :class="activeTab === 'analytics' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
-            class="px-3 py-1 rounded-md text-xs font-semibold transition-all">
-      Fleet Analytics
     </button>
     <button type="button"
             role="tab"
@@ -145,12 +126,6 @@
       </svg>
       Back to Ledger
     </button>
-    <a href="{% url 'safety:index' %}" class="btn btn-outline btn-xs border-slate-300 text-slate-700 hover:bg-slate-100 gap-1">
-      HSE Holds
-    </a>
-    <a href="{% url 'optimizer:index' %}" class="btn btn-outline btn-xs border-slate-300 text-slate-700 hover:bg-slate-100 gap-1">
-      Optimizer
-    </a>
   </div>
 </div>
 
@@ -162,69 +137,6 @@
 <!-- Band 3A: Trip Ledger Tab (Full-Width, 8 Rows Paginated, Fits Single Viewport) -->
 <div x-show="activeTab === 'ledger'" data-scroll-section data-scroll-label="Trip Ledger">
   {% include "trips/partials/trip_table.html" %}
-</div>
-
-<!-- Band 3B: Fleet Analytics Tab (Chart + Clickable Vessel Readiness Grid) -->
-<div x-show="activeTab === 'analytics'" x-cloak data-scroll-section data-scroll-label="Vessel Analytics" class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-  <section class="lg:col-span-7 surface-card p-4">
-    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-      <div>
-        <h2 class="text-sm font-semibold text-slate-900">Per-Vessel Utilization &amp; Half-Empty Share</h2>
-        <p class="text-xs text-slate-500">90-day capacity load vs. sailings below 50% (CB-01 – CB-08)</p>
-      </div>
-      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200 font-mono tabular-nums">
-        8 Vessels · % Capacity
-      </span>
-    </div>
-
-    <div class="relative h-64 sm:h-72 w-full">
-      <canvas id="tripsVesselChart" aria-label="Per-vessel utilization and half-empty share bar chart" role="img"></canvas>
-    </div>
-  </section>
-
-  <section class="lg:col-span-5 surface-card p-4 space-y-3">
-    <div class="flex items-center justify-between gap-2">
-      <div>
-        <h2 class="text-sm font-semibold text-slate-900">Fleet Readiness &amp; Filter</h2>
-        <p class="text-xs text-slate-500">Click any vessel to inspect its runs in the ledger</p>
-      </div>
-    </div>
-
-    <div class="grid grid-cols-2 gap-2.5">
-      {% for v in kpis.vessel_breakdown %}
-      <button type="button"
-              hx-get="{% url 'trips:ledger' %}?vessel={{ v.vessel_id|urlencode }}&per_page={{ filters.per_page }}"
-              hx-target="#trips-ledger-panel"
-              hx-swap="outerHTML"
-              @click="switchTab('ledger')"
-              class="text-left rounded-xl border {% if v.active_override_count > 0 or v.is_standby_designated %}border-rose-200 bg-rose-50/40 hover:border-rose-400{% else %}border-slate-200/80 bg-slate-50/60 hover:border-teal-400 hover:bg-teal-50/30{% endif %} p-2.5 space-y-1 transition-colors">
-        <div class="flex items-center justify-between gap-1.5">
-          <span class="font-mono font-semibold text-xs text-slate-900">{{ v.vessel_id }}</span>
-          {% if v.active_override_count > 0 or v.is_standby_designated %}
-          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-800 border border-rose-200">
-            Standby Lock
-          </span>
-          {% else %}
-          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-            Ready
-          </span>
-          {% endif %}
-        </div>
-        <div class="text-[11px] text-slate-500 truncate">{{ v.vessel_type }}</div>
-        <div class="flex items-center justify-between text-[11px] font-mono tabular-nums">
-          <span class="text-slate-600">{{ v.trip_count }} trips</span>
-          <span class="font-semibold {% if v.avg_util_pct < 50 %}text-amber-700{% elif v.avg_util_pct >= 70 %}text-emerald-700{% else %}text-teal-700{% endif %}">
-            {{ v.avg_util_pct|floatformat:1 }}%
-          </span>
-        </div>
-      </button>
-      {% empty %}
-      <div class="col-span-full text-xs text-slate-500 py-2 text-center">
-        No vessel telemetry available yet.
-      </div>
-      {% endfor %}
-    </div>
-  </section>
 </div>
 
 <!-- Band 3C: Dedicated Single-Screen Simple-Menu Log New Trip Workflow -->
@@ -283,136 +195,4 @@
 </div>
 {% endblock %}
 
-{% block extra_scripts %}
-<script>
-  (function () {
-    const CHART_PALETTE = {
-      teal: '#0D9488',
-      amber: '#D97706',
-      navy: '#0A1628',
-      grid: '#E2E8F0',
-    };
-
-    function renderTripsVesselChart() {
-      if (typeof Chart === 'undefined') return;
-      const dataEl = document.getElementById('trips-vessel-chart-data');
-      const canvas = document.getElementById('tripsVesselChart');
-      if (!dataEl || !canvas) return;
-
-      let chartData;
-      try {
-        chartData = JSON.parse(dataEl.textContent);
-      } catch (err) {
-        return;
-      }
-
-      const existing = Chart.getChart(canvas);
-      if (existing) {
-        existing.destroy();
-      }
-
-      new Chart(canvas, {
-        type: 'bar',
-        data: {
-          labels: chartData.labels || [],
-          datasets: [
-            {
-              label: 'Avg Utilization %',
-              data: chartData.avg_util || [],
-              backgroundColor: CHART_PALETTE.teal,
-              borderRadius: 6,
-              borderSkipped: false,
-              barPercentage: 0.72,
-              categoryPercentage: 0.72,
-            },
-            {
-              label: 'Half-Empty Share %',
-              data: chartData.half_empty_pct || [],
-              backgroundColor: CHART_PALETTE.amber,
-              borderRadius: 6,
-              borderSkipped: false,
-              barPercentage: 0.72,
-              categoryPercentage: 0.72,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: {
-            mode: 'index',
-            intersect: false,
-          },
-          plugins: {
-            legend: {
-              position: 'top',
-              align: 'end',
-              labels: {
-                boxWidth: 10,
-                boxHeight: 10,
-                usePointStyle: true,
-                pointStyle: 'circle',
-                font: {
-                  family: "'Plus Jakarta Sans', sans-serif",
-                  size: 12,
-                  weight: '500',
-                },
-                color: '#334155',
-              },
-            },
-            tooltip: {
-              backgroundColor: CHART_PALETTE.navy,
-              titleFont: { family: "'Plus Jakarta Sans', sans-serif", size: 12, weight: '600' },
-              bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
-              padding: 10,
-              cornerRadius: 8,
-              callbacks: {
-                label: function (ctx) {
-                  return ctx.dataset.label + ': ' + Number(ctx.parsed.y || 0).toFixed(1) + '%';
-                },
-              },
-            },
-          },
-          scales: {
-            x: {
-              grid: { display: false },
-              ticks: {
-                font: { family: "'JetBrains Mono', monospace", size: 11 },
-                color: '#475569',
-              },
-            },
-            y: {
-              min: 0,
-              max: 100,
-              grid: { color: CHART_PALETTE.grid },
-              border: { dash: [4, 4], display: false },
-              ticks: {
-                stepSize: 25,
-                font: { family: "'JetBrains Mono', monospace", size: 11 },
-                color: '#64748b',
-                callback: function (value) {
-                  return value + '%';
-                },
-              },
-            },
-          },
-        },
-      });
-    }
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', renderTripsVesselChart);
-    } else {
-      renderTripsVesselChart();
-    }
-
-    document.body.addEventListener('htmx:afterSettle', function (evt) {
-      if (evt.detail && evt.detail.target && evt.detail.target.id === 'trips-vessel-chart-data') {
-        renderTripsVesselChart();
-      }
-    });
-
-    window.addEventListener('trips-analytics:shown', renderTripsVesselChart);
-  })();
-</script>
-{% endblock %}
+{% block extra_scripts %}{% endblock %}

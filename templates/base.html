@@ -143,13 +143,13 @@
 <body class="min-h-screen bg-[#F6F8FB] text-slate-900 font-sans antialiased flex flex-col"
       hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 
-  <!-- Deep Maritime Navy Sticky Top Navigation Bar (Zero Burger Menu · Direct Judging Navigation) -->
-  <header id="app-topbar" class="sticky top-0 z-30 h-14 bg-[#0A1628] text-slate-100 border-b border-slate-800/80 px-4 lg:px-6 flex items-center justify-between gap-3 transition-shadow duration-200">
+  <!-- Deep Maritime Navy Sticky Top Navigation Bar (Slim 48px Chrome · Direct Judging Navigation) -->
+  <header id="app-topbar" class="sticky top-0 z-30 h-12 bg-[#0A1628] text-slate-100 border-b border-slate-800/80 px-4 lg:px-6 flex items-center justify-between gap-3 transition-shadow duration-200">
     <!-- Left: Brand Identity -->
-    <div class="flex items-center gap-3 shrink-0">
-      <a href="{% url 'core:home' %}" class="flex items-center gap-2.5 group">
-        <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500/15 ring-1 ring-teal-400/30 text-teal-300 shrink-0">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <div class="flex items-center gap-2.5 shrink-0">
+      <a href="{% url 'core:home' %}" class="flex items-center gap-2 group">
+        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-500/15 ring-1 ring-teal-400/30 text-teal-300 shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 3v4" />
             <path d="M5 10l7-3 7 3v4l-7 4-7-4v-4z" />
             <path d="M3 19c2 1.2 4 1.2 6 0s4-1.2 6 0 4 1.2 6 0" />
@@ -157,7 +157,7 @@
         </span>
         <div class="leading-tight">
           <div class="text-sm font-bold tracking-tight text-white group-hover:text-teal-200 transition-colors">CrudeInference</div>
-          <div class="hidden xl:block text-[10px] font-medium text-slate-400">KGOC Marine Fleet</div>
+          <div class="hidden xl:block text-[10px] font-medium text-slate-400 leading-none mt-0.5">KGOC Marine Fleet</div>
         </div>
       </a>
       <span class="sr-only">{% block topbar_title %}KGOC Marine Fleet · Control Tower{% endblock %}</span>
@@ -166,36 +166,36 @@
     <!-- Center: Direct Horizontal Page Links (All 5 Routes Visible) -->
     <nav id="primary-top-nav" class="flex items-center gap-1 overflow-x-auto no-scrollbar py-1" aria-label="Primary">
       <a href="{% url 'core:home' %}"
-         class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors {% if request.path == '/' %}bg-teal-500/20 text-white ring-1 ring-inset ring-teal-400/30{% else %}text-slate-300 hover:text-white hover:bg-white/[0.06]{% endif %}">
+         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors {% if request.path == '/' %}bg-teal-500/20 text-white ring-1 ring-inset ring-teal-400/30{% else %}text-slate-300 hover:text-white hover:bg-white/[0.06]{% endif %}">
         <span>Control Tower</span>
       </a>
 
       <a href="{% url 'trips:index' %}"
-         class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors {% if '/trips/' in request.path %}bg-teal-500/20 text-white ring-1 ring-inset ring-teal-400/30{% else %}text-slate-300 hover:text-white hover:bg-white/[0.06]{% endif %}">
+         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors {% if '/trips/' in request.path %}bg-teal-500/20 text-white ring-1 ring-inset ring-teal-400/30{% else %}text-slate-300 hover:text-white hover:bg-white/[0.06]{% endif %}">
         <span>Trips</span>
         <span class="font-mono tabular-nums text-[10px] px-1 py-0.5 rounded bg-white/[0.08] text-slate-300">01</span>
       </a>
 
       <a href="{% url 'optimizer:index' %}"
-         class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors {% if '/optimizer/' in request.path %}bg-teal-500/20 text-white ring-1 ring-inset ring-teal-400/30{% else %}text-slate-300 hover:text-white hover:bg-white/[0.06]{% endif %}">
+         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors {% if '/optimizer/' in request.path %}bg-teal-500/20 text-white ring-1 ring-inset ring-teal-400/30{% else %}text-slate-300 hover:text-white hover:bg-white/[0.06]{% endif %}">
         <span>Optimizer</span>
         <span class="font-mono tabular-nums text-[10px] px-1 py-0.5 rounded bg-white/[0.08] text-slate-300">02</span>
       </a>
 
       <a href="{% url 'safety:index' %}"
-         class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors {% if '/safety/' in request.path %}bg-teal-500/20 text-white ring-1 ring-inset ring-teal-400/30{% else %}text-slate-300 hover:text-white hover:bg-white/[0.06]{% endif %}">
+         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors {% if '/safety/' in request.path %}bg-teal-500/20 text-white ring-1 ring-inset ring-teal-400/30{% else %}text-slate-300 hover:text-white hover:bg-white/[0.06]{% endif %}">
         <span>Safety</span>
         <span class="font-mono tabular-nums text-[10px] px-1 py-0.5 rounded bg-white/[0.08] text-slate-300">03</span>
       </a>
 
       <a href="{% url 'core:copilot:index' %}"
-         class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors {% if '/copilot/' in request.path %}bg-indigo-500/25 text-white ring-1 ring-inset ring-indigo-400/40{% else %}text-slate-300 hover:text-white hover:bg-white/[0.06]{% endif %}">
+         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors {% if '/copilot/' in request.path %}bg-indigo-500/25 text-white ring-1 ring-inset ring-indigo-400/40{% else %}text-slate-300 hover:text-white hover:bg-white/[0.06]{% endif %}">
         <span>AI Co-Pilot</span>
         <span class="font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 whitespace-nowrap shrink-0">04 · AI</span>
       </a>
     </nav>
 
-    <!-- Right: Scroll Context, Health Telemetry & Page Action Slot -->
+    <!-- Right: Scroll Context & Single Contextual Action Slot -->
     <div class="flex items-center gap-2 shrink-0">
       <div id="topbar-scroll-context"
            class="hidden items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-white/[0.08] text-slate-200 border border-white/15 max-w-[200px]"
@@ -214,23 +214,9 @@
         </svg>
         <span class="hidden sm:inline">Top</span>
       </button>
-      <div class="hidden xl:flex items-center gap-1.5 [&_a.btn-outline]:text-slate-200 [&_a.btn-outline]:border-slate-600 [&_a.btn-outline]:hover:bg-white/10">
+      <div class="hidden lg:flex items-center gap-1.5 [&_a.btn-outline]:text-slate-200 [&_a.btn-outline]:border-slate-600 [&_a.btn-outline]:hover:bg-white/10">
         {% block topbar_actions %}{% endblock %}
       </div>
-      <a href="{% url 'core:health' %}"
-         class="hidden sm:inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/[0.06] border border-white/10 font-mono text-[11px] text-teal-300 hover:text-teal-200"
-         target="_blank"
-         rel="noopener"
-         title="System Live · Theme 4 Public Judging Mode">
-        <span class="relative flex h-2 w-2" aria-hidden="true">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-        </span>
-        /health/
-      </a>
-      <span class="hidden 2xl:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/[0.06] text-slate-300 border border-white/10">
-        Mock Data
-      </span>
     </div>
 
     <div id="scroll-progress-bar"
@@ -239,12 +225,12 @@
   </header>
 
   <!-- Main Content -->
-  <main class="flex-1 w-full max-w-7xl mx-auto px-4 lg:px-8 py-4">
+  <main class="flex-1 w-full max-w-7xl mx-auto px-4 lg:px-8 py-3">
     {% block content %}{% endblock %}
   </main>
 
   <!-- Judging Transparency Footer -->
-  <footer class="bg-white/80 border-t border-slate-200/80 text-slate-500 px-4 lg:px-8 py-2.5 text-xs text-center">
+  <footer class="bg-white/80 border-t border-slate-200/80 text-slate-500 px-4 lg:px-8 py-2 text-[11px] text-center">
     KGOC AI Hackathon · Theme 4: Marine Fleet Utilization &amp; Optimization · Public judging access (no login required) · Mock/synthetic operational data only.
   </footer>
 

@@ -18,16 +18,19 @@ from apps.core.ai import (
     generate_structured,
 )
 from apps.core.models import SafetyOverride, Trip, Vessel, VesselAvailability
+from apps.core.services import get_control_tower_metrics
 
 
 class CoreSmokeTests(TestCase):
-    def test_home_renders_with_global_htmx_csrf_header_and_health_link(self):
+    def test_home_renders_with_global_htmx_csrf_header_and_clean_slim_topbar(self):
         response = self.client.get(reverse("core:home"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "X-CSRFToken")
         self.assertContains(response, "KGOC Marine Fleet")
         self.assertContains(response, "CrudeInference")
-        self.assertContains(response, reverse("core:health"))
+        self.assertNotContains(response, reverse("core:health"))
+        self.assertNotContains(response, "DB: sqlite3")
+        self.assertNotContains(response, "gemini-4-hydrogen")
         self.assertContains(response, "Plus Jakarta Sans")
         self.assertContains(response, "JetBrains Mono")
         self.assertContains(response, "#0A1628")
@@ -331,14 +334,54 @@ class CoreSmokeTests(TestCase):
         self.assertEqual(len(brief.merge_assessments), 2)
         self.assertEqual(brief.merge_assessments[1].verdict, "hold")
 
-    def test_control_tower_renders_live_seeded_kpis_without_starter_copy(self):
+    def test_control_tower_renders_live_seeded_kpis_and_four_charts(self):
         call_command("seed_fleet", if_empty=True, stdout=io.StringIO())
         response = self.client.get(reverse("core:home"))
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Teammate A")
+        self.assertNotContains(response, "DB: sqlite3")
+        self.assertNotContains(response, "gemini-4-hydrogen")
+        self.assertNotContains(response, "Book Shift Trip")
+        self.assertNotContains(response, "Open Optimizer")
         self.assertContains(response, "Control Tower")
         self.assertContains(response, "976")
-        self.assertContains(response, "control-tower-vessel-chart")
+        self.assertContains(response, "CB-07 Standby Lock")
+        for chart_id in (
+            "control-tower-vessel-chart",
+            "control-tower-destination-chart",
+            "control-tower-savings-chart",
+            "control-tower-fuel-health-chart",
+        ):
+            self.assertContains(response, chart_id)
+        for drill_url in (
+            reverse("trips:index"),
+            f"{reverse('trips:index')}?half_empty=1",
+            reverse("optimizer:index"),
+            reverse("safety:index"),
+        ):
+            self.assertContains(response, drill_url)
+
+    def test_control_tower_metrics_chart_shapes_empty_and_seeded(self):
+        empty_metrics = get_control_tower_metrics()
+        self.assertEqual(empty_metrics["historical_trips"], 0)
+        self.assertEqual(len(empty_metrics["destination_chart_data"]["labels"]), 5)
+        self.assertEqual(empty_metrics["destination_chart_data"]["healthy_counts"], [0, 0, 0, 0, 0])
+        self.assertEqual(empty_metrics["savings_chart_data"]["merges"], [0, 0, 0, 0, 0])
+        self.assertEqual(empty_metrics["fuel_health_chart_data"]["counts"], [0, 0, 0, 0])
+
+        call_command("seed_fleet", if_empty=True, stdout=io.StringIO())
+        seeded_metrics = get_control_tower_metrics()
+        self.assertEqual(seeded_metrics["historical_trips"], 976)
+        self.assertEqual(
+            sum(seeded_metrics["destination_chart_data"]["healthy_counts"])
+            + sum(seeded_metrics["destination_chart_data"]["half_empty_counts"]),
+            976,
+        )
+        self.assertEqual(
+            sum(seeded_metrics["savings_chart_data"]["merges"]),
+            seeded_metrics["backtest_trips_eliminated"],
+        )
+        self.assertEqual(sum(seeded_metrics["fuel_health_chart_data"]["counts"]), 976)
 
     def test_copilot_4th_feature_route_and_navigation(self):
         home_response = self.client.get(reverse("core:home"))

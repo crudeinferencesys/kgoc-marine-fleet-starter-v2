@@ -6,7 +6,7 @@
 ---
 
 ## 1. Aesthetic Direction — "Hybrid Maritime Command"
-- **Shell:** Deep Maritime Navy (`#0A1628`) sticky top navigation bar with direct links to all 5 operational pages (`Control Tower`, `Trips`, `Optimizer`, `Safety`, `AI Co-Pilot` — zero burger menu) plus live `/health/` indicator, paired with a light operational workspace (`#F6F8FB`).
+- **Shell:** Slim `48px` (`h-12`) Deep Maritime Navy (`#0A1628`) sticky top navigation bar containing ONLY the brand link, direct links to all 5 operational pages (`Control Tower`, `Trips`, `Optimizer`, `Safety`, `AI Co-Pilot` — zero burger menu), and an optional single `topbar_actions` CTA (never `/health/` or `Mock Data` pills in the navbar; keep `/health/` live silently and keep the mock-data disclaimer in the quiet footer), paired with a light operational workspace (`#F6F8FB`).
 - **Cards & Depth:** Crisp white elevated surfaces (`.surface-card`: `#FFFFFF`, hairline `rgba(226,232,240,0.92)` border, subtle two-step elevation shadow, `14px` radius).
 - **Template Blocks Available in `templates/base.html`:**
   - `{% block title %}` — `<title>` tag (`Page · CrudeInference · KGOC Marine Fleet`)
@@ -48,14 +48,15 @@
 
 ---
 
-## 4. Standard 3-Band Page Anatomy & Zero-Scroll Desktop Contract
-Every slice (`/`, `/trips/`, `/optimizer/`, `/safety/`, `/copilot/`) follows this structure inside `{% block content %}`:
-1. **Band 1 — Header Band:** Eyebrow (`text-xs font-semibold uppercase tracking-wider text-teal-700`) + `h1` (`text-xl sm:text-2xl font-bold tracking-tight text-slate-900`) + 1-line operational subtitle on left; primary CTA / status pill on right (`flex flex-wrap items-center justify-between gap-2 mb-3`).
-2. **Band 2 — KPI Strip (4 Cards):** `grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3` with compact `p-3` KPI cards.
-3. **Band 3 — Workspace Grid:** `grid grid-cols-1 lg:grid-cols-12 gap-3.5` (typically `lg:col-span-7` or `lg:col-span-8` primary chart/table/solver + `lg:col-span-5` or `lg:col-span-4` 2×2 cards / action form / Gemini Co-Pilot sidebar).
+## 4. Standard Page Anatomy & Zero-Scroll Desktop Contract
+- **Control Tower (`/`) — Zero Band-1 Header Clutter:** Opens straight into **4 clickable KPI drill-down cards** (`Trips`, `Half-Empty`, `Optimizer`, `Safety`) and a **2×2 clickable executive Chart.js grid** (paired with a single `AI Co-Pilot →` CTA in `topbar_actions`), avoiding redundant page-launch card grids or visible `h1` hero headers.
+- **Feature Workspaces (`/trips/`, `/optimizer/`, `/safety/`, `/copilot/`):** Follow the compact 3-band layout inside `{% block content %}`:
+  1. **Band 1 — Slim Toolbar Header (`~36px`):** Concise `h1` + count badge, optional 2-tab switcher (`Trip Ledger` / `Log New Trip`), and at most one contextual primary action (never duplicate cross-page links already present in `#primary-top-nav`).
+  2. **Band 2 — KPI Strip (4 Cards):** `grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3` with compact `p-3` KPI cards.
+  3. **Band 3 — Workspace Grid / Table:** Focused 12-col split or full-width paginated table.
 
 > **Zero-Scroll Single-Viewport Desktop Contract (`>= 1280×760`):**
-> Every operational page — and **especially the Command Center (`/`)** — MUST fit cleanly within a single desktop viewport (`document.documentElement.scrollHeight <= window.innerHeight` at `1280×800` and `1440×900`) with **zero page-level vertical scrolling**. Keep total workspace height within `~640px` using compact headers (`~48px`), `p-3` KPI strips (`~96px`), `h-48`–`h-52` Chart.js wrappers, 2×2 card grids or Alpine tabs for secondary views, and bounded internal scroll (`max-h-[...] overflow-y-auto`) ONLY inside dense tables/lists when needed.
+> Every operational page — and **especially the Command Center (`/`)** — MUST fit cleanly within a single desktop viewport (`document.documentElement.scrollHeight <= window.innerHeight` at `1280×800` and `1440×900`) with **zero page-level vertical scrolling**. Keep total workspace height within `~620px`–`660px` using the `48px` (`h-12`) topbar, zero Band-1 bloat, `p-3` KPI strips (`~94px`), `h-44 xl:h-[205px]` Chart.js wrappers in a 2×2 grid, Alpine tabs for secondary workflows, and bounded internal scroll (`max-h-[...] overflow-y-auto`) ONLY inside dense tables/lists when needed.
 
 ---
 
@@ -277,8 +278,10 @@ Because the KJO dataset uses named offshore hubs (`Marine Base` → `Platform A/
 
 ## 7. Anti-Patterns Checklist (Do Not Ship)
 - Do **not** let desktop pages (`>= 1280×760`) overflow vertically into full-page scrolling — keep Control Tower (`/`) and core workspaces zero-scroll above the fold (use tabs, 2×2 grids, compact spacing, and bounded table scroll if needed).
+- Do **not** render developer/infrastructure metadata (`DB: sqlite3`, `gemini-4-hydrogen` model pills, `/health/` buttons) inside the global navbar or executive page bodies.
+- Do **not** add duplicate cross-page navigation buttons (`Open Optimizer`, `HSE Holds`, `Dispatch Optimizer`) inside headers when all 5 routes already live in `#primary-top-nav`.
 - Do **not** leave starter/developer copy (`Teammate A`, `apps/trips/`, `Ready for Feature 1...`) in final slice templates.
 - Do **not** add dark mode toggles, unrequested login screens, or standalone static pages.
 - Do **not** use emojis anywhere in the UI (use inline stroke SVGs).
 - Do **not** render raw unformatted floats (format KWD cleanly, percentages with `%`, liters/kg with commas).
-- Do **not** omit `hx-indicator` / `hx-disabled-elt="this"` on HTMX actions or fixed `h-64` / `h-72` wrappers on Chart.js canvases.
+- Do **not** omit `hx-indicator` / `hx-disabled-elt="this"` on HTMX actions or fixed height wrappers on Chart.js canvases.

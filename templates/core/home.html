@@ -2,414 +2,435 @@
 
 {% block title %}Control Tower · CrudeInference · KGOC Marine Fleet{% endblock %}
 
-{% block topbar_title %}Executive Control Tower{% endblock %}
+{% block topbar_title %}Control Tower{% endblock %}
 
 {% block topbar_actions %}
-<a href="{% url 'trips:index' %}" class="btn btn-primary btn-xs">Log Shift Trip</a>
+<a href="{% url 'core:copilot:index' %}" class="btn btn-xs bg-indigo-600 hover:bg-indigo-500 text-white border-0 gap-1 font-semibold">
+  AI Co-Pilot
+  <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+  </svg>
+</a>
 {% endblock %}
 
 {% block content %}
-<div class="space-y-3 lg:-my-1">
-  <!-- Band 1: Slim Header Band -->
-  <section data-scroll-section data-scroll-label="Control Tower" class="flex flex-wrap items-center justify-between gap-3">
-    <div class="min-w-0">
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-[11px] font-semibold uppercase tracking-wider text-teal-700">
-          CrudeInference · Offshore Fleet Telemetry
-        </span>
-        <span class="text-slate-300 hidden sm:inline" aria-hidden="true">·</span>
-        <span class="text-xs text-slate-500 hidden sm:inline">
-          {{ metrics.total_vessels }}-vessel KJO fleet · {{ metrics.historical_trips }} historical trips
-        </span>
-      </div>
-      <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 mt-0.5">
-        KGOC Marine Fleet Control Tower
-      </h1>
+<h1 class="sr-only">Control Tower — KGOC Marine Fleet</h1>
+{{ metrics.vessel_chart_data|json_script:"control-tower-vessel-chart" }}
+{{ metrics.destination_chart_data|json_script:"control-tower-destination-chart" }}
+{{ metrics.savings_chart_data|json_script:"control-tower-savings-chart" }}
+{{ metrics.fuel_health_chart_data|json_script:"control-tower-fuel-health-chart" }}
+
+<!-- Row 1: 4 Clickable Drill-Down KPI Cards -->
+<section data-scroll-section data-scroll-label="Fleet KPIs" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+  <!-- KPI 1: Fleet Utilization -> Trips -->
+  <a href="{% url 'trips:index' %}" class="surface-card surface-card-hover kpi-accent-teal p-3 block group">
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Fleet Utilization</span>
+      <span class="text-[11px] font-semibold text-teal-700 group-hover:translate-x-0.5 transition-transform">Trips →</span>
     </div>
-
-    <div class="flex flex-wrap items-center gap-2 shrink-0">
-      <a href="{% url 'trips:index' %}" class="btn btn-primary btn-sm gap-1.5">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 5v14" /><path d="M5 12h14" />
-        </svg>
-        Book Shift Trip
-      </a>
-      <a href="{% url 'optimizer:index' %}" class="btn btn-outline btn-sm border-slate-300 text-slate-700 hover:bg-slate-100 hover:border-slate-400 gap-1.5">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-teal-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-        </svg>
-        Open Optimizer
-      </a>
+    <div class="mt-1 flex items-baseline gap-1.5">
+      <span class="text-2xl font-bold font-mono tabular-nums text-slate-900">{{ metrics.avg_utilization_pct|floatformat:1 }}%</span>
+      <span class="text-[11px] font-mono tabular-nums text-slate-500">{{ metrics.total_vessels }} vessels</span>
     </div>
-  </section>
+    <p class="mt-0.5 text-[11px] text-slate-500 font-mono tabular-nums truncate">
+      {{ metrics.avg_pax_utilization_pct|floatformat:1 }}% pax · {{ metrics.historical_trips }} runs
+    </p>
+  </a>
 
-  <!-- Band 2: Compact 4-KPI Telemetry Strip -->
-  <section data-scroll-section data-scroll-label="Fleet KPIs" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-    <!-- KPI 1: Fleet Utilization -->
-    <div class="surface-card kpi-accent-teal p-3">
-      <div class="flex items-center justify-between gap-2">
-        <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Fleet Utilization</span>
-        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-teal-50 text-teal-700">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1 .6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1" />
-            <path d="M19.38 20A11.6 11.6 0 0 0 21 14l-9-4-9 4c0 2.9.94 5.34 2.81 7.76" />
-          </svg>
-        </span>
-      </div>
-      <div class="mt-1 flex items-baseline gap-1">
-        <span class="text-2xl font-bold font-mono tabular-nums text-slate-900">{{ metrics.avg_utilization_pct|floatformat:1 }}</span>
-        <span class="text-xs font-semibold text-slate-500">%</span>
-      </div>
-      <p class="mt-0.5 text-[11px] text-slate-500 font-mono tabular-nums truncate">
-        {{ metrics.avg_pax_utilization_pct|floatformat:1 }}% pax · {{ metrics.total_vessels }} vessels · {{ metrics.historical_trips }} trips
-      </p>
+  <!-- KPI 2: Half-Empty Sailings -> Filtered Trips -->
+  <a href="{% url 'trips:index' %}?half_empty=1" class="surface-card surface-card-hover kpi-accent-amber p-3 block group">
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Half-Empty Sailings</span>
+      <span class="text-[11px] font-semibold text-amber-700 group-hover:translate-x-0.5 transition-transform">Filter →</span>
     </div>
-
-    <!-- KPI 2: Half-Empty Sailings -->
-    <div class="surface-card kpi-accent-amber p-3">
-      <div class="flex items-center justify-between gap-2">
-        <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Half-Empty Sailings</span>
-        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-amber-50 text-amber-700">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-            <path d="M12 9v4" /><path d="M12 17h.01" />
-          </svg>
-        </span>
-      </div>
-      <div class="mt-1 flex items-baseline gap-1">
-        <span class="text-2xl font-bold font-mono tabular-nums text-amber-700">{{ metrics.half_empty_count|floatformat:"0g" }}</span>
-        <span class="text-xs font-semibold text-slate-500">sailings</span>
-      </div>
-      <p class="mt-0.5 text-[11px] text-slate-500 font-mono tabular-nums truncate">
-        {{ metrics.half_empty_pct|floatformat:1 }}% below 50% capacity
-      </p>
+    <div class="mt-1 flex items-baseline gap-1.5">
+      <span class="text-2xl font-bold font-mono tabular-nums text-amber-700">{{ metrics.half_empty_count|floatformat:"0g" }}</span>
+      <span class="text-[11px] font-semibold text-slate-500">sailings</span>
     </div>
+    <p class="mt-0.5 text-[11px] text-slate-500 font-mono tabular-nums truncate">
+      {{ metrics.half_empty_pct|floatformat:1 }}% below 50% · {{ metrics.pending_trips }} queued
+    </p>
+  </a>
 
-    <!-- KPI 3: Est. 90-Day Opportunity -->
-    <div class="surface-card kpi-accent-emerald p-3">
-      <div class="flex items-center justify-between gap-2">
-        <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Est. 90-Day Savings</span>
-        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-          </svg>
-        </span>
-      </div>
-      <div class="mt-1 flex items-baseline gap-1">
-        <span class="text-2xl font-bold font-mono tabular-nums text-emerald-700">{{ metrics.backtest_kwd_saved|floatformat:"0g" }}</span>
-        <span class="text-xs font-semibold text-slate-500">KWD</span>
-        <span class="text-[10px] font-medium text-slate-400">· mock</span>
-      </div>
-      <p class="mt-0.5 text-[11px] text-slate-500 font-mono tabular-nums truncate" title="Mock Benchmark Assumptions">
-        {{ metrics.backtest_trips_eliminated|floatformat:"0g" }} merges · {{ metrics.backtest_fuel_saved_l|floatformat:"0g" }} L · {{ metrics.backtest_co2_tonnes|floatformat:1 }} t CO₂
-      </p>
+  <!-- KPI 3: Est. 90-Day Savings -> Optimizer -->
+  <a href="{% url 'optimizer:index' %}" class="surface-card surface-card-hover kpi-accent-emerald p-3 block group">
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Est. 90-Day Savings</span>
+      <span class="text-[11px] font-semibold text-emerald-700 group-hover:translate-x-0.5 transition-transform">Optimize →</span>
     </div>
-
-    <!-- KPI 4: HSE Holds & Fuel Flags -->
-    <div class="surface-card kpi-accent-rose p-3">
-      <div class="flex items-center justify-between gap-2">
-        <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">HSE &amp; Fuel Flags</span>
-        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-rose-50 text-rose-700">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
-            <path d="M12 8v4" /><path d="M12 16h.01" />
-          </svg>
-        </span>
-      </div>
-      <div class="mt-1 flex items-baseline gap-1">
-        <span class="text-2xl font-bold font-mono tabular-nums text-rose-700">{{ metrics.active_hse_overrides_count }}</span>
-        <span class="text-xs font-semibold text-slate-500">active holds</span>
-      </div>
-      <p class="mt-0.5 text-[11px] text-slate-500 font-mono tabular-nums truncate">
-        {{ metrics.severe_fuel_anomalies_count }} high outliers · {{ metrics.missing_fuel_logs_count }} missing logs
-      </p>
+    <div class="mt-1 flex items-baseline gap-1.5">
+      <span class="text-2xl font-bold font-mono tabular-nums text-emerald-700">{{ metrics.backtest_kwd_saved|floatformat:"0g" }}</span>
+      <span class="text-xs font-semibold text-slate-500">KWD</span>
+      <span class="text-[10px] font-medium text-slate-400">· mock</span>
     </div>
-  </section>
+    <p class="mt-0.5 text-[11px] text-slate-500 font-mono tabular-nums truncate">
+      {{ metrics.backtest_trips_eliminated|floatformat:"0g" }} merges · {{ metrics.backtest_fuel_saved_l|floatformat:"0g" }} L · {{ metrics.backtest_co2_tonnes|floatformat:1 }} t CO₂
+    </p>
+  </a>
 
-  <!-- Band 3: Single-Screen 12-Col Workspace -->
-  <section data-scroll-section data-scroll-label="Fleet Analytics & Modules" class="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
-    <!-- Left Column: Chart + Compact Productive vs Idle Strip -->
-    <div class="lg:col-span-7 flex flex-col gap-3">
-      <!-- Chart.js 4 Vessel Utilization vs Trip Count Card -->
-      <div class="surface-card p-3.5 flex-1 flex flex-col justify-between">
-        <div class="flex items-center justify-between gap-2 mb-2">
-          <div>
-            <h2 class="text-sm font-semibold text-slate-900">90-Day Vessel Utilization vs Trip Count</h2>
-            <p class="text-[11px] text-slate-500">Avg load (%) vs completed sailings (CB-01–CB-08)</p>
-          </div>
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-teal-50 text-teal-800 border border-teal-200 font-mono tabular-nums whitespace-nowrap shrink-0">
-            {{ metrics.historical_trips }} historical runs
-          </span>
-        </div>
-
-        {{ metrics.vessel_chart_data|json_script:"control-tower-vessel-chart" }}
-        <div class="relative h-48 lg:h-[210px] w-full">
-          <canvas id="controlTowerVesselChart"></canvas>
-        </div>
-      </div>
-
-      <!-- Compact Productive Onsite vs Avoidable Idle Strip -->
-      <div class="surface-card px-3.5 py-2.5 space-y-1.5">
-        <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
-          <span class="font-semibold text-slate-900">Productive Onsite vs Avoidable Idle</span>
-          <div class="flex flex-wrap items-center gap-3 font-mono tabular-nums text-[11px]">
-            <span class="text-teal-700 font-semibold">{{ metrics.productive_onsite_hours|floatformat:"1g" }} h onsite</span>
-            <span class="text-amber-700 font-semibold">{{ metrics.avoidable_idle_hours|floatformat:"1g" }} h idle</span>
-            <span class="text-slate-600">{{ metrics.idle_fuel_liters|floatformat:"0g" }} L idle fuel</span>
-            <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium">
-              {{ metrics.productive_share_pct|floatformat:1 }}% productive
-            </span>
-          </div>
-        </div>
-        <div class="w-full h-2 rounded-full bg-amber-100 overflow-hidden">
-          <div class="h-full rounded-full bg-teal-600" style="width: {{ metrics.productive_share_pct }}%"></div>
-        </div>
-      </div>
+  <!-- KPI 4: HSE & Fuel Flags -> Safety -->
+  <a href="{% url 'safety:index' %}" class="surface-card surface-card-hover kpi-accent-rose p-3 block group">
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">HSE &amp; Fuel Flags</span>
+      <span class="text-[11px] font-semibold text-rose-700 group-hover:translate-x-0.5 transition-transform">Audit →</span>
     </div>
+    <div class="mt-1 flex items-baseline gap-1.5">
+      <span class="text-2xl font-bold font-mono tabular-nums text-rose-700">{{ metrics.active_hse_overrides_count }}</span>
+      <span class="text-xs font-semibold text-slate-500">active hold{{ metrics.active_hse_overrides_count|pluralize }}</span>
+    </div>
+    <p class="mt-0.5 text-[11px] text-slate-500 font-mono tabular-nums truncate">
+      {{ metrics.severe_fuel_anomalies_count }} high outliers · {{ metrics.missing_fuel_logs_count }} missing logs
+    </p>
+  </a>
+</section>
 
-    <!-- Right Column: 2x2 Feature Launch Grid + Compact Telemetry/HSE Bar -->
-    <div class="lg:col-span-5 flex flex-col gap-3">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
-        <!-- Card 01: Trips & Utilization -->
-        <a href="{% url 'trips:index' %}" class="surface-card surface-card-hover p-3.5 flex flex-col justify-between group">
-          <div class="space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <span class="flex h-7 w-7 items-center justify-center rounded-md bg-teal-50 text-teal-700 font-mono text-[11px] font-bold border border-teal-200/70">01</span>
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-900 border border-amber-200 font-mono tabular-nums">
-                {{ metrics.pending_trips }} pending
-              </span>
-            </div>
-            <div>
-              <h3 class="text-sm font-semibold text-slate-900 group-hover:text-teal-700 transition-colors">
-                Trips &amp; Utilization
-              </h3>
-              <p class="text-[11px] text-slate-500 mt-0.5 line-clamp-2">
-                Log shift requests and spot half-empty sailings.
-              </p>
-            </div>
-          </div>
-          <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            <span class="text-slate-500 font-mono tabular-nums">{{ metrics.half_empty_count }} &lt;50%</span>
-            <span class="font-semibold text-teal-700">Open →</span>
-          </div>
-        </a>
-
-        <!-- Card 02: Dispatch Optimizer -->
-        <a href="{% url 'optimizer:index' %}" class="surface-card surface-card-hover p-3.5 flex flex-col justify-between group">
-          <div class="space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <span class="flex h-7 w-7 items-center justify-center rounded-md bg-teal-50 text-teal-700 font-mono text-[11px] font-bold border border-teal-200/70">02</span>
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono tabular-nums">
-                {{ metrics.backtest_trips_eliminated }} merges
-              </span>
-            </div>
-            <div>
-              <h3 class="text-sm font-semibold text-slate-900 group-hover:text-teal-700 transition-colors">
-                Dispatch Optimizer
-              </h3>
-              <p class="text-[11px] text-slate-500 mt-0.5 line-clamp-2">
-                Consolidate overlapping runs under HSE limits.
-              </p>
-            </div>
-          </div>
-          <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            <span class="text-slate-500 font-mono tabular-nums">{{ metrics.approved_plans_count }} plans</span>
-            <span class="font-semibold text-teal-700">Open →</span>
-          </div>
-        </a>
-
-        <!-- Card 03: Safety & Fuel Guard -->
-        <a href="{% url 'safety:index' %}" class="surface-card surface-card-hover p-3.5 flex flex-col justify-between group">
-          <div class="space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <span class="flex h-7 w-7 items-center justify-center rounded-md bg-rose-50 text-rose-700 font-mono text-[11px] font-bold border border-rose-200/80">03</span>
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose-50 text-rose-800 border border-rose-200 font-mono tabular-nums">
-                {{ metrics.active_hse_overrides_count }} holds · {{ metrics.severe_fuel_anomalies_count }} flags
-              </span>
-            </div>
-            <div>
-              <h3 class="text-sm font-semibold text-slate-900 group-hover:text-teal-700 transition-colors">
-                Safety &amp; Fuel Guard
-              </h3>
-              <p class="text-[11px] text-slate-500 mt-0.5 line-clamp-2">
-                Enforce HSE locks and flag diesel outliers.
-              </p>
-            </div>
-          </div>
-          <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            <span class="text-slate-500 font-mono tabular-nums">{{ metrics.missing_fuel_logs_count }} missing</span>
-            <span class="font-semibold text-teal-700">Open →</span>
-          </div>
-        </a>
-
-        <!-- Card 04: Standalone Bonus AI Dispatch Co-Pilot -->
-        <a href="{% url 'core:copilot:index' %}" class="ai-copilot-surface surface-card-hover p-3.5 flex flex-col justify-between group">
-          <div class="space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <span class="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-600 text-white font-mono text-[11px] font-bold">04</span>
-              {% if ai_configured %}
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-600 text-white">
-                Bonus AI
-              </span>
-              {% else %}
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-900 border border-amber-200">
-                Fallback
-              </span>
-              {% endif %}
-            </div>
-            <div>
-              <h3 class="text-sm font-semibold text-indigo-950 group-hover:text-indigo-700 transition-colors">
-                AI Dispatch Co-Pilot
-              </h3>
-              <p class="text-[11px] text-slate-600 mt-0.5 line-clamp-2">
-                Gemini 4 merge risk review &amp; handover brief.
-              </p>
-            </div>
-          </div>
-          <div class="mt-2.5 pt-2 border-t border-indigo-200/60 flex items-center justify-between text-[11px]">
-            <span class="text-indigo-900/75 font-mono truncate">{{ gemini_model }}</span>
-            <span class="font-semibold text-indigo-700 shrink-0">Open →</span>
-          </div>
-        </a>
+<!-- Row 2: 2x2 Clickable Executive Chart Grid -->
+<section data-scroll-section data-scroll-label="Executive Charts" class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+  <!-- Chart 1: Vessel Utilization vs Trip Count -> /trips/ -->
+  <div class="surface-card surface-card-hover p-3 flex flex-col">
+    <a href="{% url 'trips:index' %}" class="flex items-center justify-between gap-2 mb-2 group">
+      <div class="min-w-0">
+        <h2 class="text-sm font-semibold text-slate-900 group-hover:text-teal-700 transition-colors truncate">Vessel Utilization vs. Trip Volume</h2>
+        <p class="text-[11px] text-slate-500 truncate">90-day avg load (%) vs. completed runs (CB-01–CB-08)</p>
       </div>
+      <span class="text-[11px] font-semibold text-teal-700 shrink-0">Trips →</span>
+    </a>
+    <div class="relative h-44 xl:h-[205px] w-full">
+      <canvas id="controlTowerVesselChart" class="cursor-pointer" aria-label="Vessel utilization versus trip volume chart" role="img"></canvas>
+    </div>
+  </div>
 
-      <!-- Compact Telemetry & Active HSE Lock Strip -->
-      <div class="surface-card px-3.5 py-2.5 space-y-1.5">
-        <div class="flex items-center justify-between gap-2 text-[11px]">
-          <span class="font-semibold uppercase tracking-wider text-slate-500">Active Telemetry &amp; HSE</span>
-          <div class="flex items-center gap-1.5 font-mono">
-            <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">DB: {{ db_engine }}</span>
-            <span class="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200">{{ gemini_model }}</span>
-          </div>
-        </div>
+  <!-- Chart 2: Healthy vs Half-Empty Sailings by Destination -> /trips/?half_empty=1 -->
+  <div class="surface-card surface-card-hover p-3 flex flex-col">
+    <a href="{% url 'trips:index' %}?half_empty=1" class="flex items-center justify-between gap-2 mb-2 group">
+      <div class="min-w-0">
+        <h2 class="text-sm font-semibold text-slate-900 group-hover:text-amber-700 transition-colors truncate">Half-Empty vs. Healthy Runs by Destination</h2>
+        <p class="text-[11px] text-slate-500 truncate">Corridor concentration of sailings below 50% capacity</p>
+      </div>
+      <span class="text-[11px] font-semibold text-amber-700 shrink-0">Half-Empty →</span>
+    </a>
+    <div class="relative h-44 xl:h-[205px] w-full">
+      <canvas id="controlTowerDestinationChart" class="cursor-pointer" aria-label="Healthy versus half-empty sailings by destination chart" role="img"></canvas>
+    </div>
+  </div>
+
+  <!-- Chart 3: 90-Day Merge Savings vs Avoidable Idle Fuel -> /optimizer/ -->
+  <div class="surface-card surface-card-hover p-3 flex flex-col">
+    <a href="{% url 'optimizer:index' %}" class="flex items-center justify-between gap-2 mb-2 group">
+      <div class="min-w-0">
+        <h2 class="text-sm font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors truncate">Consolidation Savings vs. Avoidable Idle Fuel</h2>
+        <p class="text-[11px] text-slate-500 font-mono tabular-nums truncate">
+          {{ metrics.backtest_trips_eliminated }} merges ({{ metrics.backtest_fuel_saved_l|floatformat:"0g" }} L) · {{ metrics.idle_fuel_liters|floatformat:"0g" }} L idle
+        </p>
+      </div>
+      <span class="text-[11px] font-semibold text-emerald-700 shrink-0">Optimizer →</span>
+    </a>
+    <div class="relative h-44 xl:h-[205px] w-full">
+      <canvas id="controlTowerSavingsChart" class="cursor-pointer" aria-label="Consolidation savings versus avoidable idle fuel chart" role="img"></canvas>
+    </div>
+  </div>
+
+  <!-- Chart 4: Fuel Telemetry & Readiness Health -> /safety/ -->
+  <div class="surface-card surface-card-hover p-3 flex flex-col">
+    <a href="{% url 'safety:index' %}" class="flex items-center justify-between gap-2 mb-2 group">
+      <div class="min-w-0">
+        <h2 class="text-sm font-semibold text-slate-900 group-hover:text-rose-700 transition-colors truncate">Fuel Telemetry &amp; HSE Readiness Health</h2>
+        <p class="text-[11px] text-slate-500 truncate">Physics fuel ratio audit across {{ metrics.historical_trips }} runs</p>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
         {% if metrics.active_hse_overrides %}
           {% with override=metrics.active_hse_overrides.0 %}
-          <div class="rounded-lg border border-rose-200 bg-rose-50/70 border-l-4 border-l-rose-600 px-2.5 py-1.5 flex items-center justify-between gap-2 text-[11px]">
-            <span class="truncate text-slate-700">
-              <strong class="text-rose-900">{{ override.get_rule_type_display }}{% if override.vessel %} · <span class="font-mono">{{ override.vessel.vessel_id }}</span>{% endif %}:</strong>
-              {{ override.reason }}
-            </span>
-            <span class="uppercase font-mono text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 shrink-0">{{ override.severity }}</span>
-          </div>
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-800 border border-rose-200 font-mono whitespace-nowrap">
+            <span class="h-1.5 w-1.5 rounded-full bg-rose-600" aria-hidden="true"></span>
+            {% if override.vessel %}{{ override.vessel.vessel_id }} Standby Lock{% else %}{{ override.get_rule_type_display }}{% endif %}
+          </span>
           {% endwith %}
-        {% else %}
-          <p class="text-[11px] text-slate-500">No active HSE overrides across the fleet.</p>
         {% endif %}
+        <span class="text-[11px] font-semibold text-rose-700">Safety →</span>
       </div>
+    </a>
+    <div class="relative h-44 xl:h-[205px] w-full">
+      <canvas id="controlTowerFuelHealthChart" class="cursor-pointer" aria-label="Fuel telemetry and HSE readiness health doughnut chart" role="img"></canvas>
     </div>
-  </section>
-</div>
+  </div>
+</section>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    const dataEl = document.getElementById('control-tower-vessel-chart');
-    const canvas = document.getElementById('controlTowerVesselChart');
-    if (!dataEl || !canvas || typeof Chart === 'undefined') return;
+    if (typeof Chart === 'undefined') return;
 
-    const payload = JSON.parse(dataEl.textContent || '{}');
+    const readPayload = (id) => {
+      const el = document.getElementById(id);
+      if (!el) return {};
+      try {
+        return JSON.parse(el.textContent || '{}');
+      } catch {
+        return {};
+      }
+    };
+
     const CHART_PALETTE = {
       teal: '#0D9488',
       emerald: '#059669',
       amber: '#D97706',
       rose: '#E11D48',
-      indigo: '#4F46E5',
+      slate: '#94A3B8',
       navy: '#0A1628',
       grid: '#E2E8F0',
     };
 
-    new Chart(canvas.getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels: payload.labels || [],
-        datasets: [
-          {
-            label: 'Avg Utilization (%)',
-            data: payload.avg_util || [],
-            backgroundColor: CHART_PALETTE.teal,
-            borderRadius: 6,
-            borderSkipped: false,
-            yAxisID: 'y',
-          },
-          {
-            label: 'Trip Count',
-            data: payload.trip_counts || [],
-            backgroundColor: 'rgba(10, 22, 40, 0.78)',
-            borderRadius: 6,
-            borderSkipped: false,
-            yAxisID: 'y1',
-          },
-        ],
+    const MONO_TICK = {
+      font: { family: "'JetBrains Mono', monospace", size: 10 },
+      color: '#475569',
+    };
+
+    const LEGEND_TOP = {
+      position: 'top',
+      align: 'end',
+      labels: {
+        boxWidth: 9,
+        boxHeight: 9,
+        padding: 8,
+        usePointStyle: true,
+        pointStyle: 'circle',
+        font: { family: "'Plus Jakarta Sans', sans-serif", size: 11 },
+        color: '#334155',
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: {
-          mode: 'index',
-          intersect: false,
+    };
+
+    // Chart 1: Vessel Utilization vs Trip Count -> /trips/
+    const vesselCanvas = document.getElementById('controlTowerVesselChart');
+    if (vesselCanvas) {
+      const vesselData = readPayload('control-tower-vessel-chart');
+      new Chart(vesselCanvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: vesselData.labels || [],
+          datasets: [
+            {
+              label: 'Avg Util (%)',
+              data: vesselData.avg_util || [],
+              backgroundColor: CHART_PALETTE.teal,
+              borderRadius: 5,
+              borderSkipped: false,
+              yAxisID: 'y',
+            },
+            {
+              label: 'Runs',
+              data: vesselData.trip_counts || [],
+              backgroundColor: 'rgba(10, 22, 40, 0.78)',
+              borderRadius: 5,
+              borderSkipped: false,
+              yAxisID: 'y1',
+            },
+          ],
         },
-        plugins: {
-          legend: {
-            labels: {
-              boxWidth: 10,
-              padding: 10,
-              font: {
-                family: "'Plus Jakarta Sans', sans-serif",
-                size: 11,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          onClick: () => { window.location.href = "{% url 'trips:index' %}"; },
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: LEGEND_TOP,
+            tooltip: {
+              backgroundColor: CHART_PALETTE.navy,
+              callbacks: {
+                afterBody(items) {
+                  if (!items.length) return '';
+                  const rate = (vesselData.half_empty_pct || [])[items[0].dataIndex];
+                  return rate !== undefined ? `Half-Empty Rate: ${rate}%` : '';
+                },
               },
             },
           },
-          tooltip: {
-            backgroundColor: CHART_PALETTE.navy,
-            callbacks: {
-              afterBody(items) {
-                if (!items.length) return '';
-                const idx = items[0].dataIndex;
-                const halfEmpty = (payload.half_empty_pct || [])[idx];
-                return halfEmpty !== undefined ? `Half-Empty Rate: ${halfEmpty}%` : '';
+          scales: {
+            x: { grid: { display: false }, ticks: MONO_TICK },
+            y: {
+              position: 'left',
+              min: 0,
+              max: 100,
+              grid: { color: CHART_PALETTE.grid },
+              border: { dash: [4, 4], display: false },
+              ticks: { ...MONO_TICK, stepSize: 25, callback: (v) => `${v}%` },
+            },
+            y1: {
+              position: 'right',
+              min: 0,
+              grid: { drawOnChartArea: false },
+              ticks: MONO_TICK,
+            },
+          },
+        },
+      });
+    }
+
+    // Chart 2: Healthy vs Half-Empty Sailings by Destination -> /trips/?half_empty=1
+    const destCanvas = document.getElementById('controlTowerDestinationChart');
+    if (destCanvas) {
+      const destData = readPayload('control-tower-destination-chart');
+      new Chart(destCanvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: destData.labels || [],
+          datasets: [
+            {
+              label: 'Half-Empty (<50%)',
+              data: destData.half_empty_counts || [],
+              backgroundColor: CHART_PALETTE.amber,
+              borderRadius: 4,
+              borderSkipped: false,
+            },
+            {
+              label: 'Healthy (>=50%)',
+              data: destData.healthy_counts || [],
+              backgroundColor: CHART_PALETTE.teal,
+              borderRadius: 4,
+              borderSkipped: false,
+            },
+          ],
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          onClick: () => { window.location.href = "{% url 'trips:index' %}?half_empty=1"; },
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: LEGEND_TOP,
+            tooltip: { backgroundColor: CHART_PALETTE.navy },
+          },
+          scales: {
+            x: {
+              stacked: true,
+              grid: { color: CHART_PALETTE.grid },
+              border: { dash: [4, 4], display: false },
+              ticks: MONO_TICK,
+            },
+            y: {
+              stacked: true,
+              grid: { display: false },
+              ticks: {
+                font: { family: "'Plus Jakarta Sans', sans-serif", size: 10 },
+                color: '#334155',
               },
             },
           },
         },
-        scales: {
-          x: {
-            grid: { display: false },
-            ticks: {
-              font: {
-                family: "'JetBrains Mono', monospace",
-                size: 10,
+      });
+    }
+
+    // Chart 3: Merge Savings vs Avoidable Idle Fuel by Destination -> /optimizer/
+    const savingsCanvas = document.getElementById('controlTowerSavingsChart');
+    if (savingsCanvas) {
+      const savingsData = readPayload('control-tower-savings-chart');
+      new Chart(savingsCanvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: savingsData.labels || [],
+          datasets: [
+            {
+              label: 'Merge Savings (L)',
+              data: savingsData.merge_fuel_l || [],
+              backgroundColor: CHART_PALETTE.emerald,
+              borderRadius: 5,
+              borderSkipped: false,
+            },
+            {
+              label: 'Avoidable Idle (L)',
+              data: savingsData.idle_fuel_l || [],
+              backgroundColor: CHART_PALETTE.amber,
+              borderRadius: 5,
+              borderSkipped: false,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          onClick: () => { window.location.href = "{% url 'optimizer:index' %}"; },
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: LEGEND_TOP,
+            tooltip: {
+              backgroundColor: CHART_PALETTE.navy,
+              callbacks: {
+                afterBody(items) {
+                  if (!items.length) return '';
+                  const merges = (savingsData.merges || [])[items[0].dataIndex];
+                  return merges !== undefined ? `Consolidated Pairs: ${merges}` : '';
+                },
               },
             },
           },
-          y: {
-            position: 'left',
-            min: 0,
-            max: 100,
-            grid: { color: CHART_PALETTE.grid },
-            border: { dash: [4, 4], display: false },
-            ticks: {
-              callback: (v) => `${v}%`,
-              font: {
-                family: "'JetBrains Mono', monospace",
-                size: 10,
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: {
+                font: { family: "'Plus Jakarta Sans', sans-serif", size: 10 },
+                color: '#334155',
               },
             },
-          },
-          y1: {
-            position: 'right',
-            min: 0,
-            grid: { drawOnChartArea: false },
-            ticks: {
-              font: {
-                family: "'JetBrains Mono', monospace",
-                size: 10,
+            y: {
+              min: 0,
+              grid: { color: CHART_PALETTE.grid },
+              border: { dash: [4, 4], display: false },
+              ticks: {
+                ...MONO_TICK,
+                callback: (v) => `${Number(v).toLocaleString()} L`,
               },
             },
           },
         },
-      },
-    });
+      });
+    }
+
+    // Chart 4: Fuel Telemetry & Readiness Health -> /safety/
+    const fuelCanvas = document.getElementById('controlTowerFuelHealthChart');
+    if (fuelCanvas) {
+      const fuelData = readPayload('control-tower-fuel-health-chart');
+      new Chart(fuelCanvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: fuelData.labels || [],
+          datasets: [
+            {
+              data: fuelData.counts || [],
+              backgroundColor: [
+                CHART_PALETTE.teal,
+                CHART_PALETTE.rose,
+                CHART_PALETTE.amber,
+                CHART_PALETTE.slate,
+              ],
+              borderWidth: 2,
+              borderColor: '#FFFFFF',
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '64%',
+          onClick: () => { window.location.href = "{% url 'safety:index' %}"; },
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: {
+                boxWidth: 10,
+                boxHeight: 10,
+                padding: 10,
+                usePointStyle: true,
+                pointStyle: 'circle',
+                font: { family: "'Plus Jakarta Sans', sans-serif", size: 11 },
+                color: '#334155',
+              },
+            },
+            tooltip: { backgroundColor: CHART_PALETTE.navy },
+          },
+        },
+      });
+    }
   });
 </script>
 {% endblock %}

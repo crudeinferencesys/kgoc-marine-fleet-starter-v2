@@ -193,7 +193,7 @@ class TripsViewIntegrationTests(TestCase):
         response = self.client.get(reverse("trips:index"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "976")
-        self.assertContains(response, "trips-vessel-chart-data")
+        self.assertNotContains(response, "trips-vessel-chart-data")
         self.assertContains(response, "vessels-meta-data")
         self.assertContains(response, "TR-QUEUE-01")
 
@@ -329,7 +329,9 @@ class TripsViewIntegrationTests(TestCase):
         self.assertContains(response, "Sea State &amp; Fuel Audit")
         self.assertContains(response, "Export CSV")
         self.assertContains(response, "Trip Ledger")
-        self.assertContains(response, "Fleet Analytics")
+        self.assertNotContains(response, "Fleet Analytics")
+        self.assertNotContains(response, "Dispatch Optimizer")
+        self.assertNotContains(response, "HSE Holds")
 
     def test_booking_workflow_query_param_and_destination_distances(self):
         response = self.client.get(reverse("trips:index"), data={"book": "1"})
