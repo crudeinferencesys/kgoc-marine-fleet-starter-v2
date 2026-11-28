@@ -1,0 +1,761 @@
+<section id="safety-anomaly-panel"
+         {% if oob %}hx-swap-oob="outerHTML"{% endif %}
+         x-data="{
+           moreOpen: false,
+           activeCat: 0,
+           draft: {
+             anomaly: '{{ filters.anomaly|escapejs }}',
+             min_ratio: '{{ filters.min_ratio|escapejs }}',
+             hold_state: '{{ filters.hold_state|escapejs }}',
+             vessel: '{{ filters.vessel|escapejs }}',
+             vessel_type: '{{ filters.vessel_type|escapejs }}',
+             mission_type: '{{ filters.mission_type|escapejs }}',
+             destination: '{{ filters.destination|escapejs }}',
+             weather: '{{ filters.weather|escapejs }}',
+             priority: '{{ filters.priority|escapejs }}'
+           },
+           prevCat() { this.activeCat = (this.activeCat + 2) % 3; },
+           nextCat() { this.activeCat = (this.activeCat + 1) % 3; },
+           catCount(idx) {
+             const d = this.draft;
+             if (idx === 0) {
+               return [d.anomaly && d.anomaly !== 'flagged', d.min_ratio, d.hold_state].filter(Boolean).length;
+             }
+             if (idx === 1) {
+               return [d.vessel, d.vessel_type, d.mission_type].filter(Boolean).length;
+             }
+             return [d.destination, d.weather, d.priority].filter(Boolean).length;
+           },
+           resetDraft() {
+             this.draft = {
+               anomaly: 'flagged',
+               min_ratio: '',
+               hold_state: '',
+               vessel: '',
+               vessel_type: '',
+               mission_type: '',
+               destination: '',
+               weather: '',
+               priority: ''
+             };
+           }
+         }"
+         @keydown.escape.window="moreOpen = false"
+         @keydown.arrow-left.window="if (moreOpen && !['INPUT', 'SELECT', 'TEXTAREA'].includes($event.target.tagName)) prevCat()"
+         @keydown.arrow-right.window="if (moreOpen && !['INPUT', 'SELECT', 'TEXTAREA'].includes($event.target.tagName)) nextCat()"
+         class="surface-card overflow-hidden">
+
+  {% if audit_notice %}
+  <div class="px-4 py-2 bg-teal-50 border-b border-teal-200 flex flex-wrap items-center justify-between gap-2 htmx-fade-in">
+    <div class="flex items-center gap-2 text-xs font-medium text-teal-900">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-teal-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <path d="m9 12 2 2 4-4" />
+      </svg>
+      <span>{{ audit_notice }}</span>
+    </div>
+    <button type="button"
+            @click="$dispatch('safety-tab:holds')"
+            class="text-xs font-semibold text-teal-800 hover:text-teal-950 underline shrink-0">
+      View Active Holds
+    </button>
+  </div>
+  {% endif %}
+
+  <!-- Direct 1-Line Control Bar + More Filters Modal Trigger + CSV Export -->
+  <div class="px-4 py-2 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+    <div class="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
+      <form hx-get="{% url 'safety:anomalies' %}"
+            hx-target="#safety-anomaly-panel"
+            hx-swap="outerHTML"
+            hx-trigger="submit, keyup changed delay:300ms from:input[name='q']"
+            class="w-44 sm:w-52">
+        <input type="hidden" name="anomaly" value="{{ filters.anomaly }}" />
+        <input type="hidden" name="min_ratio" value="{{ filters.min_ratio }}" />
+        <input type="hidden" name="hold_state" value="{{ filters.hold_state }}" />
+        <input type="hidden" name="vessel" value="{{ filters.vessel }}" />
+        <input type="hidden" name="vessel_type" value="{{ filters.vessel_type }}" />
+        <input type="hidden" name="mission_type" value="{{ filters.mission_type }}" />
+        <input type="hidden" name="destination" value="{{ filters.destination }}" />
+        <input type="hidden" name="weather" value="{{ filters.weather }}" />
+        <input type="hidden" name="priority" value="{{ filters.priority }}" />
+        <input type="hidden" name="per_page" value="{{ filters.per_page }}" />
+        <label for="safety-filter-q" class="sr-only">Search fuel audit</label>
+        <input id="safety-filter-q"
+               type="text"
+               name="q"
+               value="{{ filters.q }}"
+               placeholder="Search Trip, Vessel, area…"
+               class="input input-bordered input-xs w-full bg-white text-xs" />
+      </form>
+
+      <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Quick fuel audit presets">
+        <button type="button"
+                hx-get="{% url 'safety:anomalies' %}?anomaly=flagged&per_page={{ filters.per_page }}"
+                hx-target="#safety-anomaly-panel"
+                hx-swap="outerHTML"
+                class="btn btn-xs rounded-full border {% if filters.anomaly == 'flagged' and not filters.min_ratio and not filters.hold_state and not filters.vessel and not filters.vessel_type and not filters.mission_type and not filters.destination and not filters.weather and not filters.priority and not filters.q %}bg-slate-900 text-white border-slate-900{% else %}bg-white text-slate-700 border-slate-200 hover:bg-slate-50{% endif %}">
+          All Flagged <span class="font-mono tabular-nums opacity-85">{{ preset_counts.flagged }}</span>
+        </button>
+
+        <button type="button"
+                hx-get="{% url 'safety:anomalies' %}?anomaly=high&per_page={{ filters.per_page }}"
+                hx-target="#safety-anomaly-panel"
+                hx-swap="outerHTML"
+                class="btn btn-xs rounded-full border {% if filters.anomaly == 'high' and not filters.min_ratio and not filters.vessel and not filters.destination and not filters.weather %}bg-rose-600 text-white border-rose-600{% else %}bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100/80{% endif %}">
+          High ≥1.3× <span class="font-mono tabular-nums">{{ preset_counts.high }}</span>
+        </button>
+
+        <button type="button"
+                hx-get="{% url 'safety:anomalies' %}?anomaly=low&per_page={{ filters.per_page }}"
+                hx-target="#safety-anomaly-panel"
+                hx-swap="outerHTML"
+                class="btn btn-xs rounded-full border {% if filters.anomaly == 'low' and not filters.vessel and not filters.destination and not filters.weather %}bg-amber-600 text-white border-amber-600{% else %}bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100/80{% endif %}">
+          Low ≤0.7× <span class="font-mono tabular-nums">{{ preset_counts.low }}</span>
+        </button>
+
+        <button type="button"
+                hx-get="{% url 'safety:anomalies' %}?anomaly=missing&per_page={{ filters.per_page }}"
+                hx-target="#safety-anomaly-panel"
+                hx-swap="outerHTML"
+                class="btn btn-xs rounded-full border {% if filters.anomaly == 'missing' and not filters.vessel and not filters.destination and not filters.weather %}bg-slate-800 text-white border-slate-800{% else %}bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200/70{% endif %}">
+          Missing Logs <span class="font-mono tabular-nums">{{ preset_counts.missing }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Right: More Filters Overlay Button + Export CSV -->
+    <div class="flex items-center gap-1.5 shrink-0">
+      <button type="button"
+              @click="moreOpen = true"
+              :aria-expanded="moreOpen.toString()"
+              aria-controls="safety-more-filters-modal"
+              class="btn btn-xs border {% if advanced_filter_count > 0 %}bg-teal-50 border-teal-300 text-teal-900{% else %}bg-white border-slate-200 text-slate-700 hover:bg-slate-50{% endif %} gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+        </svg>
+        <span>More Filters</span>
+        {% if advanced_filter_count > 0 %}
+        <span class="font-mono tabular-nums px-1.5 py-0.2 rounded-full bg-teal-600 text-white text-[10px]">{{ advanced_filter_count }}</span>
+        {% endif %}
+      </button>
+
+      <a href="{% url 'safety:export_csv' %}?anomaly={{ filters.anomaly|urlencode }}&min_ratio={{ filters.min_ratio|urlencode }}&hold_state={{ filters.hold_state|urlencode }}&vessel={{ filters.vessel|urlencode }}&vessel_type={{ filters.vessel_type|urlencode }}&mission_type={{ filters.mission_type|urlencode }}&destination={{ filters.destination|urlencode }}&weather={{ filters.weather|urlencode }}&priority={{ filters.priority|urlencode }}&q={{ filters.q|urlencode }}"
+         class="btn btn-xs bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 gap-1"
+         title="Download all {{ total_filtered_count }} filtered audit rows as CSV">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-teal-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" x2="12" y1="15" y2="3" />
+        </svg>
+        <span>Export CSV</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Active Removable Filter Chips Bar -->
+  {% if filters.anomaly != 'flagged' or filters.min_ratio or filters.hold_state or filters.vessel or filters.vessel_type or filters.mission_type or filters.destination or filters.weather or filters.priority or filters.q %}
+  <div class="px-4 py-1.5 bg-slate-50 border-b border-slate-100 flex flex-wrap items-center gap-1.5 text-[11px]">
+    <span class="font-semibold uppercase tracking-wider text-slate-400 mr-1 text-[10px]">Active:</span>
+
+    {% if filters.anomaly and filters.anomaly != 'flagged' %}
+    <button type="button"
+            hx-get="{% url 'safety:anomalies' %}?anomaly=flagged&min_ratio={{ filters.min_ratio|urlencode }}&hold_state={{ filters.hold_state|urlencode }}&vessel={{ filters.vessel|urlencode }}&vessel_type={{ filters.vessel_type|urlencode }}&mission_type={{ filters.mission_type|urlencode }}&destination={{ filters.destination|urlencode }}&weather={{ filters.weather|urlencode }}&priority={{ filters.priority|urlencode }}&q={{ filters.q|urlencode }}&per_page={{ filters.per_page }}"
+            hx-target="#safety-anomaly-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-800 hover:border-rose-400">
+      <span>Scope: {{ filters.anomaly }}</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    {% if filters.min_ratio %}
+    <button type="button"
+            hx-get="{% url 'safety:anomalies' %}?anomaly={{ filters.anomaly|urlencode }}&hold_state={{ filters.hold_state|urlencode }}&vessel={{ filters.vessel|urlencode }}&vessel_type={{ filters.vessel_type|urlencode }}&mission_type={{ filters.mission_type|urlencode }}&destination={{ filters.destination|urlencode }}&weather={{ filters.weather|urlencode }}&priority={{ filters.priority|urlencode }}&q={{ filters.q|urlencode }}&per_page={{ filters.per_page }}"
+            hx-target="#safety-anomaly-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-800 hover:border-rose-400 font-mono">
+      <span>Ratio ≥ {{ filters.min_ratio }}×</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    {% if filters.hold_state %}
+    <button type="button"
+            hx-get="{% url 'safety:anomalies' %}?anomaly={{ filters.anomaly|urlencode }}&min_ratio={{ filters.min_ratio|urlencode }}&vessel={{ filters.vessel|urlencode }}&vessel_type={{ filters.vessel_type|urlencode }}&mission_type={{ filters.mission_type|urlencode }}&destination={{ filters.destination|urlencode }}&weather={{ filters.weather|urlencode }}&priority={{ filters.priority|urlencode }}&q={{ filters.q|urlencode }}&per_page={{ filters.per_page }}"
+            hx-target="#safety-anomaly-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-rose-300">
+      <span>Hold: {% if filters.hold_state == 'held' %}Active{% else %}Unheld{% endif %}</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    {% if filters.vessel %}
+    <button type="button"
+            hx-get="{% url 'safety:anomalies' %}?anomaly={{ filters.anomaly|urlencode }}&min_ratio={{ filters.min_ratio|urlencode }}&hold_state={{ filters.hold_state|urlencode }}&vessel_type={{ filters.vessel_type|urlencode }}&mission_type={{ filters.mission_type|urlencode }}&destination={{ filters.destination|urlencode }}&weather={{ filters.weather|urlencode }}&priority={{ filters.priority|urlencode }}&q={{ filters.q|urlencode }}&per_page={{ filters.per_page }}"
+            hx-target="#safety-anomaly-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-rose-300 font-mono">
+      <span>Vessel: {{ filters.vessel }}</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    {% if filters.vessel_type %}
+    <button type="button"
+            hx-get="{% url 'safety:anomalies' %}?anomaly={{ filters.anomaly|urlencode }}&min_ratio={{ filters.min_ratio|urlencode }}&hold_state={{ filters.hold_state|urlencode }}&vessel={{ filters.vessel|urlencode }}&mission_type={{ filters.mission_type|urlencode }}&destination={{ filters.destination|urlencode }}&weather={{ filters.weather|urlencode }}&priority={{ filters.priority|urlencode }}&q={{ filters.q|urlencode }}&per_page={{ filters.per_page }}"
+            hx-target="#safety-anomaly-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-rose-300">
+      <span>Class: {{ filters.vessel_type }}</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    {% if filters.mission_type %}
+    <button type="button"
+            hx-get="{% url 'safety:anomalies' %}?anomaly={{ filters.anomaly|urlencode }}&min_ratio={{ filters.min_ratio|urlencode }}&hold_state={{ filters.hold_state|urlencode }}&vessel={{ filters.vessel|urlencode }}&vessel_type={{ filters.vessel_type|urlencode }}&destination={{ filters.destination|urlencode }}&weather={{ filters.weather|urlencode }}&priority={{ filters.priority|urlencode }}&q={{ filters.q|urlencode }}&per_page={{ filters.per_page }}"
+            hx-target="#safety-anomaly-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-rose-300">
+      <span>Mission: {{ filters.mission_type }}</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    {% if filters.destination %}
+    <button type="button"
+            hx-get="{% url 'safety:anomalies' %}?anomaly={{ filters.anomaly|urlencode }}&min_ratio={{ filters.min_ratio|urlencode }}&hold_state={{ filters.hold_state|urlencode }}&vessel={{ filters.vessel|urlencode }}&vessel_type={{ filters.vessel_type|urlencode }}&mission_type={{ filters.mission_type|urlencode }}&weather={{ filters.weather|urlencode }}&priority={{ filters.priority|urlencode }}&q={{ filters.q|urlencode }}&per_page={{ filters.per_page }}"
+            hx-target="#safety-anomaly-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-rose-300">
+      <span>Area: {{ filters.destination }}</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    {% if filters.weather %}
+    <button type="button"
+            hx-get="{% url 'safety:anomalies' %}?anomaly={{ filters.anomaly|urlencode }}&min_ratio={{ filters.min_ratio|urlencode }}&hold_state={{ filters.hold_state|urlencode }}&vessel={{ filters.vessel|urlencode }}&vessel_type={{ filters.vessel_type|urlencode }}&mission_type={{ filters.mission_type|urlencode }}&destination={{ filters.destination|urlencode }}&priority={{ filters.priority|urlencode }}&q={{ filters.q|urlencode }}&per_page={{ filters.per_page }}"
+            hx-target="#safety-anomaly-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-rose-300">
+      <span>Sea: {% if filters.weather == 'non_rough' %}Calm / Moderate{% else %}{{ filters.weather }}{% endif %}</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    {% if filters.priority %}
+    <button type="button"
+            hx-get="{% url 'safety:anomalies' %}?anomaly={{ filters.anomaly|urlencode }}&min_ratio={{ filters.min_ratio|urlencode }}&hold_state={{ filters.hold_state|urlencode }}&vessel={{ filters.vessel|urlencode }}&vessel_type={{ filters.vessel_type|urlencode }}&mission_type={{ filters.mission_type|urlencode }}&destination={{ filters.destination|urlencode }}&weather={{ filters.weather|urlencode }}&q={{ filters.q|urlencode }}&per_page={{ filters.per_page }}"
+            hx-target="#safety-anomaly-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-rose-300">
+      <span>Priority: {{ filters.priority }}</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    {% if filters.q %}
+    <button type="button"
+            hx-get="{% url 'safety:anomalies' %}?anomaly={{ filters.anomaly|urlencode }}&min_ratio={{ filters.min_ratio|urlencode }}&hold_state={{ filters.hold_state|urlencode }}&vessel={{ filters.vessel|urlencode }}&vessel_type={{ filters.vessel_type|urlencode }}&mission_type={{ filters.mission_type|urlencode }}&destination={{ filters.destination|urlencode }}&weather={{ filters.weather|urlencode }}&priority={{ filters.priority|urlencode }}&per_page={{ filters.per_page }}"
+            hx-target="#safety-anomaly-panel"
+            hx-swap="outerHTML"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-rose-300">
+      <span>Query: "{{ filters.q }}"</span><span aria-hidden="true">×</span>
+    </button>
+    {% endif %}
+
+    <button type="button"
+            hx-get="{% url 'safety:anomalies' %}?anomaly=flagged&per_page={{ filters.per_page }}"
+            hx-target="#safety-anomaly-panel"
+            hx-swap="outerHTML"
+            class="ml-auto font-semibold text-teal-700 hover:text-teal-900 underline">
+      Clear All
+    </button>
+  </div>
+  {% endif %}
+
+  <!-- Compact Viewport-Fitted Physics Fuel Audit Table -->
+  <div class="overflow-x-auto">
+    <table class="table table-xs w-full">
+      <thead>
+        <tr class="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-wider border-b border-slate-200">
+          <th>Trip / Date</th>
+          <th>Vessel &amp; Corridor</th>
+          <th class="text-right">Actual / Exp (L)</th>
+          <th class="text-right">Excess Impact</th>
+          <th>Engineering Flag</th>
+          <th class="text-right">Action</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100 text-xs">
+        {% for row in page_obj %}
+        <tr class="hover:bg-slate-50/80 transition-colors">
+          <td class="py-1.5 whitespace-nowrap">
+            <div class="flex items-center gap-1.5">
+              <button type="button"
+                      hx-get="{% url 'safety:inspect' row.trip.trip_id %}"
+                      hx-target="#safety-inspector-body"
+                      hx-swap="innerHTML"
+                      @click="$dispatch('safety-inspector:open')"
+                      class="font-mono tabular-nums text-xs font-semibold text-teal-700 hover:text-teal-900 underline decoration-teal-500/40">
+                {{ row.trip.trip_id }}
+              </button>
+              <span class="font-mono tabular-nums text-[11px] text-slate-400">
+                {{ row.trip.trip_date|date:"M d" }}
+              </span>
+            </div>
+          </td>
+
+          <td class="py-1.5 whitespace-nowrap">
+            <div class="flex items-center gap-1.5">
+              <span class="font-mono text-xs font-semibold text-slate-900">{{ row.trip.vessel.vessel_id }}</span>
+              <span class="text-slate-300">·</span>
+              <span class="text-xs font-medium text-slate-800">{{ row.trip.destination }}</span>
+              {% if row.has_active_standby_lock %}
+              <span class="hidden xl:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-50 text-teal-800 border border-teal-200">Standby</span>
+              {% endif %}
+            </div>
+          </td>
+
+          <td class="py-1.5 text-right whitespace-nowrap">
+            <div class="inline-flex items-center justify-end gap-2">
+              <span class="font-mono tabular-nums text-xs text-slate-700">
+                {% if row.actual_fuel_l is not None %}{{ row.actual_fuel_l|floatformat:1 }}{% else %}—{% endif %}
+                <span class="text-slate-400">/</span>
+                {{ row.expected_fuel_l|floatformat:1 }} L
+              </span>
+              {% if row.anomaly_status == 'high' %}
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-mono tabular-nums font-semibold bg-rose-50 text-rose-800 border border-rose-200">
+                {{ row.fuel_ratio|floatformat:2 }}×
+              </span>
+              {% elif row.anomaly_status == 'low' %}
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-mono tabular-nums font-semibold bg-amber-50 text-amber-900 border border-amber-200">
+                {{ row.fuel_ratio|floatformat:2 }}×
+              </span>
+              {% elif row.anomaly_status == 'missing' %}
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-mono font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                Missing
+              </span>
+              {% else %}
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-mono tabular-nums font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+                {{ row.fuel_ratio|floatformat:2 }}×
+              </span>
+              {% endif %}
+            </div>
+          </td>
+
+          <td class="py-1.5 text-right whitespace-nowrap">
+            {% if row.anomaly_status == 'high' %}
+            <span class="font-mono tabular-nums text-xs font-semibold text-rose-700">
+              +{{ row.excess_positive_l|floatformat:1 }} L
+            </span>
+            <span class="font-mono tabular-nums text-[11px] text-slate-500 ml-1">
+              · {{ row.excess_kwd|floatformat:2 }} KWD
+            </span>
+            {% elif row.anomaly_status == 'low' %}
+            <span class="font-mono tabular-nums text-xs font-medium text-amber-800">
+              {{ row.fuel_excess_l|floatformat:1 }} L
+            </span>
+            {% elif row.anomaly_status == 'missing' %}
+            <span class="font-mono tabular-nums text-[11px] text-slate-500">Log gap</span>
+            {% else %}
+            <span class="font-mono tabular-nums text-[11px] text-slate-400">Within band</span>
+            {% endif %}
+          </td>
+
+          <td class="py-1.5 whitespace-nowrap">
+            <div class="flex items-center gap-1.5">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium
+                {% if row.anomaly_status == 'high' %}bg-rose-50 text-rose-800 border border-rose-200
+                {% elif row.anomaly_status == 'low' %}bg-amber-50 text-amber-900 border border-amber-200
+                {% elif row.anomaly_status == 'missing' %}bg-slate-100 text-slate-700 border border-slate-200
+                {% else %}bg-emerald-50 text-emerald-800 border border-emerald-200{% endif %}">
+                {{ row.investigation_label }}
+              </span>
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium
+                {% if row.trip.weather == 'Rough' %}bg-rose-50 text-rose-800 border border-rose-200
+                {% elif row.trip.weather == 'Moderate' %}bg-amber-50 text-amber-900 border border-amber-200
+                {% else %}bg-slate-100 text-slate-600 border border-slate-200{% endif %}">
+                {{ row.trip.weather }}
+              </span>
+            </div>
+          </td>
+
+          <td class="py-1.5 text-right whitespace-nowrap">
+            <div class="inline-flex items-center justify-end gap-1.5">
+              <button type="button"
+                      hx-get="{% url 'safety:inspect' row.trip.trip_id %}"
+                      hx-target="#safety-inspector-body"
+                      hx-swap="innerHTML"
+                      @click="$dispatch('safety-inspector:open')"
+                      class="btn btn-ghost btn-xs h-6 min-h-0 px-2 text-[11px] text-slate-600 hover:text-slate-900 border border-slate-200 font-medium">
+                Inspect
+              </button>
+
+              {% if row.has_active_maintenance_hold %}
+              <button type="button"
+                      @click="$dispatch('safety-tab:holds')"
+                      title="Active Maintenance Hold on {{ row.trip.vessel.vessel_id }} — click to manage holds"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-rose-100 text-rose-800 border border-rose-200 hover:bg-rose-200/70 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <path d="m9 12 2 2 4-4" />
+                </svg>
+                <span>Hold Active</span>
+              </button>
+              {% else %}
+              <button type="button"
+                      hx-post="{% url 'safety:quick_hold' row.trip.trip_id %}?anomaly={{ filters.anomaly|urlencode }}&min_ratio={{ filters.min_ratio|urlencode }}&hold_state={{ filters.hold_state|urlencode }}&vessel={{ filters.vessel|urlencode }}&vessel_type={{ filters.vessel_type|urlencode }}&mission_type={{ filters.mission_type|urlencode }}&destination={{ filters.destination|urlencode }}&weather={{ filters.weather|urlencode }}&priority={{ filters.priority|urlencode }}&q={{ filters.q|urlencode }}&per_page={{ filters.per_page }}&page={{ page_obj.number }}"
+                      hx-target="#safety-anomaly-panel"
+                      hx-swap="outerHTML"
+                      hx-indicator="#hold-spin-{{ row.trip.trip_id }}"
+                      hx-disabled-elt="this"
+                      class="btn btn-xs h-6 min-h-0 px-2 text-[11px] bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-600 hover:text-white hover:border-rose-600 font-medium gap-1">
+                <span class="htmx-hide-on-request">Maintenance Hold</span>
+                <span id="hold-spin-{{ row.trip.trip_id }}" class="htmx-indicator items-center gap-1">
+                  <span class="loading loading-spinner loading-xs"></span>
+                  Saving…
+                </span>
+              </button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="py-8 text-center">
+            <p class="text-sm font-medium text-slate-700">No completed sailings match the current fuel audit filters.</p>
+            <p class="text-xs text-slate-500 mt-1">Adjust your search criteria or click Clear All to view all flagged telemetry anomalies.</p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination + Page-Size Footer -->
+  <div class="px-4 py-2 bg-slate-50/70 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+    <div class="flex items-center gap-3">
+      <span class="font-mono tabular-nums">
+        {% if total_filtered_count > 0 %}
+        Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ total_filtered_count }}
+        {% else %}
+        0 trips matched
+        {% endif %}
+      </span>
+      <div class="hidden sm:inline-flex items-center gap-1 text-[11px]" role="group" aria-label="Rows per page">
+        <span class="text-slate-400">Rows:</span>
+        {% for size in per_page_choices %}
+        <button type="button"
+                hx-get="{% url 'safety:anomalies' %}?anomaly={{ filters.anomaly|urlencode }}&min_ratio={{ filters.min_ratio|urlencode }}&hold_state={{ filters.hold_state|urlencode }}&vessel={{ filters.vessel|urlencode }}&vessel_type={{ filters.vessel_type|urlencode }}&mission_type={{ filters.mission_type|urlencode }}&destination={{ filters.destination|urlencode }}&weather={{ filters.weather|urlencode }}&priority={{ filters.priority|urlencode }}&q={{ filters.q|urlencode }}&per_page={{ size }}"
+                hx-target="#safety-anomaly-panel"
+                hx-swap="outerHTML"
+                class="px-1.5 py-0.5 rounded font-mono tabular-nums {% if filters.per_page == size %}bg-slate-900 text-white{% else %}bg-white text-slate-600 border border-slate-200 hover:bg-slate-100{% endif %}">
+          {{ size }}
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="flex items-center gap-1.5">
+      {% if page_obj.has_previous %}
+      <button type="button"
+              class="btn btn-outline btn-xs border-slate-300 text-slate-700 bg-white hover:bg-slate-100"
+              hx-get="{% url 'safety:anomalies' %}?page={{ page_obj.previous_page_number }}&anomaly={{ filters.anomaly|urlencode }}&min_ratio={{ filters.min_ratio|urlencode }}&hold_state={{ filters.hold_state|urlencode }}&vessel={{ filters.vessel|urlencode }}&vessel_type={{ filters.vessel_type|urlencode }}&mission_type={{ filters.mission_type|urlencode }}&destination={{ filters.destination|urlencode }}&weather={{ filters.weather|urlencode }}&priority={{ filters.priority|urlencode }}&q={{ filters.q|urlencode }}&per_page={{ filters.per_page }}"
+              hx-target="#safety-anomaly-panel"
+              hx-swap="outerHTML">
+        Previous
+      </button>
+      {% else %}
+      <button type="button" class="btn btn-outline btn-xs border-slate-200 text-slate-400" disabled>Previous</button>
+      {% endif %}
+
+      <span class="px-2 font-mono tabular-nums text-slate-700">
+        Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+      </span>
+
+      {% if page_obj.has_next %}
+      <button type="button"
+              class="btn btn-outline btn-xs border-slate-300 text-slate-700 bg-white hover:bg-slate-100"
+              hx-get="{% url 'safety:anomalies' %}?page={{ page_obj.next_page_number }}&anomaly={{ filters.anomaly|urlencode }}&min_ratio={{ filters.min_ratio|urlencode }}&hold_state={{ filters.hold_state|urlencode }}&vessel={{ filters.vessel|urlencode }}&vessel_type={{ filters.vessel_type|urlencode }}&mission_type={{ filters.mission_type|urlencode }}&destination={{ filters.destination|urlencode }}&weather={{ filters.weather|urlencode }}&priority={{ filters.priority|urlencode }}&q={{ filters.q|urlencode }}&per_page={{ filters.per_page }}"
+              hx-target="#safety-anomaly-panel"
+              hx-swap="outerHTML">
+        Next
+      </button>
+      {% else %}
+      <button type="button" class="btn btn-outline btn-xs border-slate-200 text-slate-400" disabled>Next</button>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Categorized Full-Screen "More Filters" Overlay Modal (HTMX+Alpine Settle Safe) -->
+  <div id="safety-more-filters-modal"
+       x-show="moreOpen"
+       x-cloak
+       style="display: none;"
+       :class="{ 'flex': moreOpen, 'hidden': !moreOpen }"
+       x-transition.opacity.duration.150ms
+       @click.self="moreOpen = false"
+       class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
+       role="dialog"
+       aria-modal="true"
+       aria-labelledby="safety-more-filters-title">
+    <form hx-get="{% url 'safety:anomalies' %}"
+          hx-target="#safety-anomaly-panel"
+          hx-swap="outerHTML"
+          @submit="moreOpen = false"
+          class="w-full max-w-3xl bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <input type="hidden" name="q" value="{{ filters.q }}" />
+      <input type="hidden" name="per_page" value="{{ filters.per_page }}" />
+      <input type="hidden" name="anomaly" :value="draft.anomaly" />
+      <input type="hidden" name="min_ratio" :value="draft.min_ratio" />
+      <input type="hidden" name="hold_state" :value="draft.hold_state" />
+      <input type="hidden" name="vessel" :value="draft.vessel" />
+      <input type="hidden" name="vessel_type" :value="draft.vessel_type" />
+      <input type="hidden" name="mission_type" :value="draft.mission_type" />
+      <input type="hidden" name="destination" :value="draft.destination" />
+      <input type="hidden" name="weather" :value="draft.weather" />
+      <input type="hidden" name="priority" :value="draft.priority" />
+
+      <!-- Modal Header -->
+      <div class="px-5 py-4 bg-[#0A1628] text-slate-100 flex items-center justify-between gap-3">
+        <div>
+          <h3 id="safety-more-filters-title" class="text-sm font-bold text-white">More Filters · Fuel Audit Explorer</h3>
+          <p class="text-[11px] text-slate-400">Browse categorized filter groups with arrows or click tabs directly</p>
+        </div>
+        <button type="button"
+                @click="moreOpen = false"
+                class="btn btn-ghost btn-xs btn-square text-slate-300 hover:text-white"
+                aria-label="Close more filters overlay">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Category Carousel Stepper with Left / Right Arrows -->
+      <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
+        <button type="button"
+                @click="prevCat()"
+                class="btn btn-outline btn-xs btn-square border-slate-300 bg-white text-slate-700 hover:bg-slate-100 shrink-0"
+                aria-label="Previous filter category">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+        </button>
+
+        <div class="flex flex-1 items-center justify-center gap-1.5 overflow-x-auto py-0.5" role="tablist" aria-label="Fuel audit filter categories">
+          <button type="button"
+                  role="tab"
+                  :aria-selected="(activeCat === 0).toString()"
+                  @click="activeCat = 0"
+                  :class="activeCat === 0 ? 'bg-teal-600 text-white border-teal-600 shadow-sm' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'"
+                  class="btn btn-xs rounded-full border gap-1.5 whitespace-nowrap">
+            <span>Fuel Audit &amp; Severity</span>
+            <span x-show="catCount(0) > 0" x-text="catCount(0)" class="font-mono text-[10px] px-1.5 rounded-full bg-black/15"></span>
+          </button>
+
+          <button type="button"
+                  role="tab"
+                  :aria-selected="(activeCat === 1).toString()"
+                  @click="activeCat = 1"
+                  :class="activeCat === 1 ? 'bg-teal-600 text-white border-teal-600 shadow-sm' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'"
+                  class="btn btn-xs rounded-full border gap-1.5 whitespace-nowrap">
+            <span>Vessel &amp; Class</span>
+            <span x-show="catCount(1) > 0" x-text="catCount(1)" class="font-mono text-[10px] px-1.5 rounded-full bg-black/15"></span>
+          </button>
+
+          <button type="button"
+                  role="tab"
+                  :aria-selected="(activeCat === 2).toString()"
+                  @click="activeCat = 2"
+                  :class="activeCat === 2 ? 'bg-teal-600 text-white border-teal-600 shadow-sm' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'"
+                  class="btn btn-xs rounded-full border gap-1.5 whitespace-nowrap">
+            <span>Corridor &amp; Sea State</span>
+            <span x-show="catCount(2) > 0" x-text="catCount(2)" class="font-mono text-[10px] px-1.5 rounded-full bg-black/15"></span>
+          </button>
+        </div>
+
+        <button type="button"
+                @click="nextCat()"
+                class="btn btn-outline btn-xs btn-square border-slate-300 bg-white text-slate-700 hover:bg-slate-100 shrink-0"
+                aria-label="Next filter category">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Categorized Filter Panels -->
+      <div class="p-5 overflow-y-auto space-y-5 min-h-[260px]">
+        <!-- Category 0: Fuel Audit & Severity -->
+        <div x-show="activeCat === 0" class="space-y-4">
+          <div class="space-y-1.5">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Physics Anomaly Classification</div>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" @click="draft.anomaly = 'flagged'"
+                      :class="draft.anomaly === 'flagged' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'"
+                      class="btn btn-xs rounded-full border">All Flagged ({{ preset_counts.flagged }})</button>
+              <button type="button" @click="draft.anomaly = 'high'"
+                      :class="draft.anomaly === 'high' ? 'bg-rose-600 text-white border-rose-600' : 'bg-rose-50 text-rose-800 border-rose-200'"
+                      class="btn btn-xs rounded-full border">High ≥1.3× ({{ preset_counts.high }})</button>
+              <button type="button" @click="draft.anomaly = 'low'"
+                      :class="draft.anomaly === 'low' ? 'bg-amber-600 text-white border-amber-600' : 'bg-amber-50 text-amber-900 border-amber-200'"
+                      class="btn btn-xs rounded-full border">Low ≤0.7× ({{ preset_counts.low }})</button>
+              <button type="button" @click="draft.anomaly = 'missing'"
+                      :class="draft.anomaly === 'missing' ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-100 text-slate-700 border-slate-200'"
+                      class="btn btn-xs rounded-full border">Missing Logs ({{ preset_counts.missing }})</button>
+              <button type="button" @click="draft.anomaly = 'normal'"
+                      :class="draft.anomaly === 'normal' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-50 text-emerald-800 border-emerald-200'"
+                      class="btn btn-xs rounded-full border">Nominal ({{ preset_counts.normal }})</button>
+              <button type="button" @click="draft.anomaly = 'all'"
+                      :class="draft.anomaly === 'all' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-700 border-slate-200'"
+                      class="btn btn-xs rounded-full border">All Completed ({{ preset_counts.all }})</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="space-y-1.5">
+              <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Minimum Fuel Ratio Threshold</div>
+              <div class="flex flex-wrap gap-1.5">
+                <button type="button" @click="draft.min_ratio = ''"
+                        :class="!draft.min_ratio ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'"
+                        class="btn btn-xs rounded-full border">Any</button>
+                <button type="button" @click="draft.min_ratio = draft.min_ratio === '1.3' ? '' : '1.3'"
+                        :class="draft.min_ratio === '1.3' ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-700 border-slate-200'"
+                        class="btn btn-xs rounded-full border font-mono">≥1.30×</button>
+                <button type="button" @click="draft.min_ratio = draft.min_ratio === '1.5' ? '' : '1.5'"
+                        :class="draft.min_ratio === '1.5' ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-700 border-slate-200'"
+                        class="btn btn-xs rounded-full border font-mono">≥1.50×</button>
+                <button type="button" @click="draft.min_ratio = draft.min_ratio === '1.75' ? '' : '1.75'"
+                        :class="draft.min_ratio === '1.75' ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-700 border-slate-200'"
+                        class="btn btn-xs rounded-full border font-mono">≥1.75×</button>
+              </div>
+            </div>
+
+            <div class="space-y-1.5">
+              <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Vessel Maintenance Hold State</div>
+              <div class="flex flex-wrap gap-1.5">
+                <button type="button" @click="draft.hold_state = ''"
+                        :class="!draft.hold_state ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'"
+                        class="btn btn-xs rounded-full border">Any</button>
+                <button type="button" @click="draft.hold_state = draft.hold_state === 'unheld' ? '' : 'unheld'"
+                        :class="draft.hold_state === 'unheld' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-700 border-slate-200'"
+                        class="btn btn-xs rounded-full border">Unheld Vessels</button>
+                <button type="button" @click="draft.hold_state = draft.hold_state === 'held' ? '' : 'held'"
+                        :class="draft.hold_state === 'held' ? 'bg-rose-600 text-white border-rose-600' : 'bg-rose-50 text-rose-800 border-rose-200'"
+                        class="btn btn-xs rounded-full border">Maint. Hold Active</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category 1: Vessel & Class -->
+        <div x-show="activeCat === 1" x-cloak class="space-y-4">
+          <div class="space-y-1.5">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Vessel Class</div>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" @click="draft.vessel_type = ''"
+                      :class="!draft.vessel_type ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'"
+                      class="btn btn-xs rounded-full border">All Classes</button>
+              {% for vtype in vessel_types %}
+              <button type="button" @click="draft.vessel_type = draft.vessel_type === '{{ vtype|escapejs }}' ? '' : '{{ vtype|escapejs }}'"
+                      :class="draft.vessel_type === '{{ vtype|escapejs }}' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-700 border-slate-200'"
+                      class="btn btn-xs rounded-full border">{{ vtype }}</button>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Specific Vessel Callsign</div>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" @click="draft.vessel = ''"
+                      :class="!draft.vessel ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'"
+                      class="btn btn-xs rounded-full border">All Vessels</button>
+              {% for v in vessels %}
+              <button type="button" @click="draft.vessel = draft.vessel === '{{ v.vessel_id|escapejs }}' ? '' : '{{ v.vessel_id|escapejs }}'"
+                      :class="draft.vessel === '{{ v.vessel_id|escapejs }}' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-700 border-slate-200'"
+                      class="btn btn-xs rounded-full border font-mono">{{ v.vessel_id }}</button>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Mission Profile</div>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" @click="draft.mission_type = ''"
+                      :class="!draft.mission_type ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'"
+                      class="btn btn-xs rounded-full border">All Missions</button>
+              {% for mission in mission_types %}
+              <button type="button" @click="draft.mission_type = draft.mission_type === '{{ mission|escapejs }}' ? '' : '{{ mission|escapejs }}'"
+                      :class="draft.mission_type === '{{ mission|escapejs }}' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-700 border-slate-200'"
+                      class="btn btn-xs rounded-full border">{{ mission }}</button>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Category 2: Corridor & Sea State -->
+        <div x-show="activeCat === 2" x-cloak class="space-y-4">
+          <div class="space-y-1.5">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Offshore Area / Destination</div>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" @click="draft.destination = ''"
+                      :class="!draft.destination ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'"
+                      class="btn btn-xs rounded-full border">All Corridors</button>
+              {% for dest in destinations %}
+              <button type="button" @click="draft.destination = draft.destination === '{{ dest|escapejs }}' ? '' : '{{ dest|escapejs }}'"
+                      :class="draft.destination === '{{ dest|escapejs }}' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-700 border-slate-200'"
+                      class="btn btn-xs rounded-full border">{{ dest }}</button>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Sea-State Context</div>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" @click="draft.weather = ''"
+                      :class="!draft.weather ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'"
+                      class="btn btn-xs rounded-full border">All Sea States</button>
+              <button type="button" @click="draft.weather = draft.weather === 'non_rough' ? '' : 'non_rough'"
+                      :class="draft.weather === 'non_rough' ? 'bg-teal-600 text-white border-teal-600' : 'bg-teal-50 text-teal-900 border-teal-200'"
+                      class="btn btn-xs rounded-full border">Calm / Moderate Priority ({{ preset_counts.non_rough_high }} high)</button>
+              {% for w in weather_states %}
+              <button type="button" @click="draft.weather = draft.weather === '{{ w|escapejs }}' ? '' : '{{ w|escapejs }}'"
+                      :class="draft.weather === '{{ w|escapejs }}' ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-700 border-slate-200'"
+                      class="btn btn-xs rounded-full border">{% if w == 'Rough' %}Rough ({{ preset_counts.rough_high }} high){% else %}{{ w }}{% endif %}</button>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Dispatch Priority</div>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" @click="draft.priority = ''"
+                      :class="!draft.priority ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'"
+                      class="btn btn-xs rounded-full border">All Priorities</button>
+              {% for p in priorities %}
+              <button type="button" @click="draft.priority = draft.priority === '{{ p|escapejs }}' ? '' : '{{ p|escapejs }}'"
+                      :class="draft.priority === '{{ p|escapejs }}' ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-700 border-slate-200'"
+                      class="btn btn-xs rounded-full border">{{ p }}</button>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <button type="button"
+                  @click="resetDraft()"
+                  class="btn btn-ghost btn-xs text-slate-600 hover:text-slate-900">
+            Reset Draft
+          </button>
+          <span class="text-[11px] font-mono text-slate-400" x-text="'Category ' + (activeCat + 1) + ' / 3'"></span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button type="button" @click="moreOpen = false" class="btn btn-ghost btn-xs text-slate-600">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-xs px-4">Apply Filters</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</section>

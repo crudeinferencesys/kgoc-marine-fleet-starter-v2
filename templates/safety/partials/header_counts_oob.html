@@ -1,0 +1,10 @@
+<span id="safety-header-summary-badge"
+      hx-swap-oob="outerHTML"
+      class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono tabular-nums bg-slate-100 text-slate-700 border border-slate-200">
+  {{ kpis.total_flagged_count }} flagged · {{ kpis.active_holds_count }} active hold{% if kpis.active_holds_count != 1 %}s{% endif %}
+</span>
+<span id="safety-holds-tab-badge"
+      hx-swap-oob="outerHTML"
+      class="font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded-full {% if kpis.active_holds_count > 0 %}bg-rose-100 text-rose-800{% else %}bg-slate-200 text-slate-600{% endif %}">
+  {{ kpis.active_holds_count }}
+</span>

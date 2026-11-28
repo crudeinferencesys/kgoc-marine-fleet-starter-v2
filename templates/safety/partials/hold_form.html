@@ -1,0 +1,710 @@
+<div id="safety-hold-panel"
+     {% if oob %}hx-swap-oob="outerHTML"{% endif %}
+     x-data="{ showConfirmation: {% if created_hold %}true{% else %}false{% endif %} }"
+     class="surface-card overflow-hidden">
+  {{ safety_scope_meta|json_script:"safety-scope-meta-data" }}
+
+  {% if created_hold %}
+  <!-- Dedicated Confirmation Screen After Persisting New HSE Hold -->
+  <div x-show="showConfirmation" class="htmx-fade-in">
+    <div class="px-5 py-3.5 bg-[#0A1628] text-white flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <span class="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        </span>
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-wider text-emerald-300">HSE Override Active</div>
+          <div class="font-mono tabular-nums text-sm font-bold text-white">
+            {{ created_hold.override.get_rule_type_display }} · {{ created_hold.target_label }}
+          </div>
+        </div>
+      </div>
+      <span class="font-mono uppercase text-xs font-semibold px-2.5 py-1 rounded-full bg-white/10 text-white border border-white/15">
+        {{ created_hold.override.get_severity_display }}
+      </span>
+    </div>
+
+    <div class="p-5 space-y-4">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Target Scope</div>
+          <div class="mt-1 font-mono tabular-nums text-xs font-bold text-slate-900">{{ created_hold.target_label }}</div>
+          <div class="text-[10px] text-slate-500 truncate">{{ created_hold.target_sublabel }}</div>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Rule Type</div>
+          <div class="mt-1 text-xs font-semibold text-slate-900">{{ created_hold.override.get_rule_type_display }}</div>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Pending Trips Blocked</div>
+          <div class="mt-1 font-mono tabular-nums text-xs font-bold {% if created_hold.affected_pending_count > 0 %}text-rose-700{% else %}text-slate-900{% endif %}">
+            {{ created_hold.affected_pending_count }} queued
+          </div>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Issued By</div>
+          <div class="mt-1 text-xs font-semibold text-slate-900 truncate">{{ created_hold.override.created_by_role }}</div>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-700 space-y-1">
+        <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Engineering / HSE Rationale</div>
+        <p class="leading-relaxed text-slate-800">{{ created_hold.override.reason }}</p>
+        {% if created_hold.affected_pending_ids %}
+        <div class="pt-1 font-mono tabular-nums text-[11px] text-rose-700">
+          Affected pending requests: {{ created_hold.affected_pending_ids|join:", " }}
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button"
+                  @click="showConfirmation = false"
+                  class="btn btn-primary btn-sm gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 5v14" /><path d="M5 12h14" />
+            </svg>
+            Add Another Hold
+          </button>
+          <button type="button"
+                  @click="$dispatch('safety-tab:holds')"
+                  class="btn btn-outline btn-sm border-slate-300 text-slate-700 hover:bg-slate-100">
+            View Active Holds
+          </button>
+          <button type="button"
+                  @click="$dispatch('safety-tab:audit')"
+                  class="btn btn-ghost btn-sm text-slate-700 hover:text-slate-900">
+            Back to Fuel Audit
+          </button>
+        </div>
+
+        <a href="{% url 'optimizer:index' %}" class="btn btn-outline btn-sm border-teal-300 text-teal-800 hover:bg-teal-50 gap-1.5">
+          Open Optimizer
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+          </svg>
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Un-ID'd Wrapper Keeping #safety-hold-form Free of x-show (HTMX Settle Safe) -->
+  <div x-show="!showConfirmation" x-cloak>
+    <form id="safety-hold-form"
+          method="post"
+          action="{% url 'safety:create_hold' %}"
+          hx-post="{% url 'safety:create_hold' %}"
+          hx-target="#safety-hold-panel"
+          hx-swap="outerHTML"
+          hx-indicator="#hold-submit-spinner"
+          hx-disabled-elt="button[type='submit'], button[data-skip-submit]"
+          x-data="{
+            step: {% if form.vessel.errors or form.destination.errors or form.non_field_errors %}2{% elif form.reason.errors or form.created_by_role.errors %}3{% else %}1{% endif %},
+            scopeMeta: { vessels: {}, destinations: [] },
+            ruleType: 'weather_hold',
+            severity: 'high',
+            vesselId: '',
+            destination: 'Platform C',
+            createdByRole: 'Marine Operations Supervisor',
+            reason: '',
+            reasonTouched: false,
+            getForm() {
+              return this.$root || document.getElementById('safety-hold-form');
+            },
+            init() {
+              try {
+                const el = document.getElementById('safety-scope-meta-data');
+                const parsed = el ? JSON.parse(el.textContent) : {};
+                const rawVessels = parsed.vessels || {};
+                const vesselMap = {};
+                if (Array.isArray(rawVessels)) {
+                  rawVessels.forEach((v) => { vesselMap[String(v.pk)] = v; });
+                } else {
+                  Object.entries(rawVessels).forEach(([k, v]) => { vesselMap[String(k)] = v; });
+                }
+                this.scopeMeta = {
+                  vessels: vesselMap,
+                  destinations: Array.isArray(parsed.destinations) ? parsed.destinations : []
+                };
+              } catch (e) {
+                this.scopeMeta = { vessels: {}, destinations: [] };
+              }
+              this.syncFromDom();
+              {% if not form.is_bound %}
+              this.ensureValidTargetForRule(this.ruleType);
+              {% endif %}
+            },
+            syncFromDom() {
+              const form = this.getForm();
+              if (!form) return;
+              const rEl = form.querySelector('[name=rule_type]');
+              const sEl = form.querySelector('[name=severity]');
+              const vEl = form.querySelector('[name=vessel]');
+              const dEl = form.querySelector('[name=destination]');
+              const roleEl = form.querySelector('[name=created_by_role]');
+              const reasonEl = form.querySelector('[name=reason]');
+              this.ruleType = rEl && rEl.value ? String(rEl.value) : 'weather_hold';
+              this.severity = sEl && sEl.value ? String(sEl.value) : 'high';
+              this.vesselId = vEl ? String(vEl.value || '') : '';
+              this.destination = dEl ? String(dEl.value || '') : '';
+              this.createdByRole = roleEl && roleEl.value ? String(roleEl.value) : 'Marine Operations Supervisor';
+              this.reason = reasonEl ? String(reasonEl.value || '') : '';
+            },
+            get isVesselRule() {
+              return this.ruleType === 'maintenance_hold' || this.ruleType === 'standby_lock';
+            },
+            get vesselList() {
+              return Object.values(this.scopeMeta.vessels || {});
+            },
+            findVesselMeta(pk) {
+              return (this.scopeMeta.vessels || {})[String(pk)] || null;
+            },
+            get selectedVessel() {
+              return this.vesselId ? this.findVesselMeta(this.vesselId) : null;
+            },
+            get selectedDestinationMeta() {
+              return (this.scopeMeta.destinations || []).find((d) => String(d.value) === String(this.destination)) || null;
+            },
+            vesselHasActiveRule(pk, rule) {
+              const v = this.findVesselMeta(pk);
+              return Boolean(v && Array.isArray(v.active_rule_types) && v.active_rule_types.includes(rule));
+            },
+            get isDuplicateSelected() {
+              if (this.ruleType === 'weather_hold') {
+                const dm = this.selectedDestinationMeta;
+                return Boolean(dm && dm.has_active_weather_hold);
+              }
+              if (!this.vesselId) return false;
+              return this.vesselHasActiveRule(this.vesselId, this.ruleType);
+            },
+            ensureValidTargetForRule(val) {
+              const form = this.getForm();
+              if (!form) return;
+              const vEl = form.querySelector('[name=vessel]');
+              const dEl = form.querySelector('[name=destination]');
+              if (val === 'weather_hold') {
+                if (vEl) vEl.value = '';
+                this.vesselId = '';
+                const dests = this.scopeMeta.destinations || [];
+                const preferred = dests.find((d) => d.value === 'Platform C' && !d.has_active_weather_hold)
+                  || dests.find((d) => !d.has_active_weather_hold)
+                  || dests[0];
+                const nextDest = preferred ? String(preferred.value) : '';
+                if (dEl) dEl.value = nextDest;
+                this.destination = nextDest;
+              } else {
+                if (dEl) dEl.value = '';
+                this.destination = '';
+                const list = this.vesselList;
+                let pick = null;
+                if (val === 'maintenance_hold') {
+                  pick = list.find((v) => v.vessel_id === 'CB-08' && !(v.active_rule_types || []).includes('maintenance_hold'))
+                    || list.find((v) => !(v.active_rule_types || []).includes('maintenance_hold'))
+                    || list[0];
+                } else {
+                  pick = list.find((v) => !(v.active_rule_types || []).includes('standby_lock'))
+                    || list[0];
+                }
+                const nextPk = pick ? String(pick.pk) : '';
+                if (vEl) vEl.value = nextPk;
+                this.vesselId = nextPk;
+              }
+            },
+            pickRuleType(val) {
+              const form = this.getForm();
+              if (!form) return;
+              const rEl = form.querySelector('[name=rule_type]');
+              if (rEl) rEl.value = val;
+              this.ruleType = val;
+              this.ensureValidTargetForRule(val);
+            },
+            pickSeverity(val) {
+              const form = this.getForm();
+              if (!form) return;
+              const sEl = form.querySelector('[name=severity]');
+              if (sEl) sEl.value = val;
+              this.severity = val;
+            },
+            pickVessel(pk) {
+              const form = this.getForm();
+              if (!form) return;
+              const key = String(pk);
+              const vEl = form.querySelector('[name=vessel]');
+              const dEl = form.querySelector('[name=destination]');
+              if (vEl) vEl.value = key;
+              if (dEl) dEl.value = '';
+              this.vesselId = key;
+              this.destination = '';
+            },
+            pickDestination(val) {
+              const form = this.getForm();
+              if (!form) return;
+              const dEl = form.querySelector('[name=destination]');
+              const vEl = form.querySelector('[name=vessel]');
+              if (dEl) dEl.value = val;
+              if (vEl) vEl.value = '';
+              this.destination = val;
+              this.vesselId = '';
+            },
+            pickRole(val) {
+              const form = this.getForm();
+              if (!form) return;
+              const roleEl = form.querySelector('[name=created_by_role]');
+              if (roleEl) roleEl.value = val;
+              this.createdByRole = val;
+            },
+            applyReasonPreset(text) {
+              const form = this.getForm();
+              if (!form) return;
+              const reasonEl = form.querySelector('[name=reason]');
+              if (reasonEl) reasonEl.value = text;
+              this.reason = text;
+              this.reasonTouched = true;
+            },
+            nextStep() {
+              if (this.step === 2 && (this.isDuplicateSelected || (this.isVesselRule && !this.vesselId))) {
+                return;
+              }
+              if (this.step < 3) this.step += 1;
+            },
+            prevStep() {
+              if (this.step > 1) this.step -= 1;
+            },
+            skipOptionalAndSubmit() {
+              const form = this.getForm();
+              if (!form) return;
+              if (this.isVesselRule && !this.vesselId) {
+                this.ensureValidTargetForRule(this.ruleType);
+              }
+              if (this.isDuplicateSelected) {
+                this.step = 2;
+                return;
+              }
+              const roleEl = form.querySelector('[name=created_by_role]');
+              if (roleEl && !roleEl.value.trim()) {
+                roleEl.value = 'Marine Operations Supervisor';
+              }
+              this.syncFromDom();
+              if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit();
+              } else if (window.htmx) {
+                window.htmx.trigger(form, 'submit');
+              } else {
+                form.submit();
+              }
+            },
+            get ruleLabel() {
+              if (this.ruleType === 'maintenance_hold') return 'Maintenance Hold';
+              if (this.ruleType === 'standby_lock') return 'Standby Lock';
+              return 'Weather Hold';
+            },
+            get summaryTargetLabel() {
+              if (this.isVesselRule) {
+                return this.selectedVessel ? this.selectedVessel.vessel_id : 'Select vessel';
+              }
+              return this.destination || 'All Rough-Sea Corridors';
+            },
+            get stepProgressPct() {
+              if (this.step === 1) return 33;
+              if (this.step === 2) return 67;
+              return 100;
+            },
+            get remainingLabel() {
+              if (this.isDuplicateSelected) return 'Duplicate active hold on target — choose another scope';
+              if (this.step === 1) return 'Step 1 of 3 · 1 target step + 1 optional step left';
+              if (this.step === 2) return 'Step 2 of 3 · Only optional rationale left (skippable)';
+              return 'Step 3 of 3 · Smart engineering defaults ready to submit';
+            }
+          }"
+          @input="syncFromDom()"
+          @change="syncFromDom()">
+      {% csrf_token %}
+
+      <!-- Deep Maritime Navy Workflow Header + Teal Progress Bar -->
+      <div class="bg-[#0A1628] text-slate-100">
+        <div class="px-5 py-3 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center gap-2.5">
+            <h2 class="text-sm font-bold text-white tracking-tight">Add HSE Safety Override</h2>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-white/10 text-teal-200 border border-white/10"
+                  x-text="remainingLabel"></span>
+          </div>
+          <button type="button"
+                  @click="$dispatch('safety-tab:audit')"
+                  class="btn btn-ghost btn-xs text-slate-300 hover:text-white gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+            Back to Audit
+          </button>
+        </div>
+        <div class="h-1 w-full bg-white/10">
+          <div class="h-full bg-teal-400 transition-all duration-200"
+               :style="'width: ' + stepProgressPct + '%'"></div>
+        </div>
+      </div>
+
+      <!-- Clickable Step Pills + Live Selection Summary Pill -->
+      <div class="px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="HSE hold workflow steps">
+          <button type="button"
+                  role="tab"
+                  :aria-selected="(step === 1).toString()"
+                  @click="step = 1"
+                  :class="step === 1 ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : (step > 1 ? 'bg-teal-50 text-teal-900 border-teal-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100')"
+                  class="px-2.5 py-1 rounded-full border text-xs font-semibold transition-colors">
+            1. Rule Type &amp; Severity
+          </button>
+          <button type="button"
+                  role="tab"
+                  :aria-selected="(step === 2).toString()"
+                  @click="step = 2"
+                  :class="step === 2 ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : (step > 2 ? 'bg-teal-50 text-teal-900 border-teal-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100')"
+                  class="px-2.5 py-1 rounded-full border text-xs font-semibold transition-colors">
+            2. Target Scope
+          </button>
+          <button type="button"
+                  role="tab"
+                  :aria-selected="(step === 3).toString()"
+                  @click="step = 3"
+                  :class="step === 3 ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'"
+                  class="px-2.5 py-1 rounded-full border text-xs font-semibold transition-colors">
+            3. Optional Reason &amp; Role
+          </button>
+        </div>
+
+        <div class="inline-flex items-center gap-2 text-[11px] font-mono tabular-nums text-slate-600 bg-white px-2.5 py-1 rounded-full border border-slate-200">
+          <span x-text="ruleLabel + ' · ' + summaryTargetLabel"></span>
+          <span class="uppercase font-semibold"
+                :class="severity === 'critical' ? 'text-rose-700' : (severity === 'high' ? 'text-amber-700' : 'text-teal-700')"
+                x-text="severity"></span>
+        </div>
+      </div>
+
+      {% if form.non_field_errors %}
+      <div class="mx-5 mt-4 rounded-xl border border-rose-200 bg-rose-50/90 border-l-4 border-l-rose-600 p-3 space-y-1 htmx-fade-in" role="alert">
+        <div class="text-xs font-semibold uppercase tracking-wider text-rose-800">HSE Override Validation</div>
+        {% for err in form.non_field_errors %}
+        <p class="text-xs text-rose-900 font-medium">{{ err }}</p>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Workflow Step Body -->
+      <div class="p-5">
+        <!-- Keep Django select fields mounted inside sr-only wrappers so skipped submissions send all fields -->
+        <div class="sr-only">
+          <label for="{{ form.rule_type.id_for_label }}">Rule Type</label>
+          {{ form.rule_type }}
+          <label for="{{ form.severity.id_for_label }}">Severity</label>
+          {{ form.severity }}
+          <label for="{{ form.vessel.id_for_label }}">Target Vessel</label>
+          {{ form.vessel }}
+          <label for="{{ form.destination.id_for_label }}">Target Corridor</label>
+          {{ form.destination }}
+        </div>
+
+        <!-- Step 1: Rule Type & Severity Menu Cards -->
+        <div x-show="step === 1" class="space-y-4">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-600">Select HSE Rule Type</span>
+              <span class="text-[11px] text-slate-500">Enforced immediately across Dispatch Optimizer</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <button type="button"
+                      @click="pickRuleType('weather_hold')"
+                      :class="ruleType === 'weather_hold' ? 'border-teal-600 bg-teal-50/90 text-slate-900 ring-1 ring-teal-500/30 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'"
+                      class="rounded-xl border p-3.5 text-left transition-all space-y-1.5">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M2 12c1.5-1.5 3-1.5 4.5 0s3 1.5 4.5 0 3-1.5 4.5 0 3 1.5 4.5 0" />
+                      <path d="M2 17c1.5-1.5 3-1.5 4.5 0s3 1.5 4.5 0 3-1.5 4.5 0 3 1.5 4.5 0" />
+                      <path d="M12 3v5" /><path d="m8 6 4 2 4-2" />
+                    </svg>
+                  </span>
+                  <span x-show="ruleType === 'weather_hold'" class="h-2 w-2 rounded-full bg-teal-600 shrink-0"></span>
+                </div>
+                <div class="text-xs font-bold text-slate-900">Sea-State / Weather Hold</div>
+                <p class="text-[11px] text-slate-500 leading-snug">Restrict a specific offshore corridor or all Rough-sea departures.</p>
+              </button>
+
+              <button type="button"
+                      @click="pickRuleType('maintenance_hold')"
+                      :class="ruleType === 'maintenance_hold' ? 'border-teal-600 bg-teal-50/90 text-slate-900 ring-1 ring-teal-500/30 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'"
+                      class="rounded-xl border p-3.5 text-left transition-all space-y-1.5">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                    </svg>
+                  </span>
+                  <span x-show="ruleType === 'maintenance_hold'" class="h-2 w-2 rounded-full bg-teal-600 shrink-0"></span>
+                </div>
+                <div class="text-xs font-bold text-slate-900">Vessel Maintenance Hold</div>
+                <p class="text-[11px] text-slate-500 leading-snug">Hold a vessel for engine, hull, or fuel-system engineering inspection.</p>
+              </button>
+
+              <button type="button"
+                      @click="pickRuleType('standby_lock')"
+                      :class="ruleType === 'standby_lock' ? 'border-teal-600 bg-teal-50/90 text-slate-900 ring-1 ring-teal-500/30 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'"
+                      class="rounded-xl border p-3.5 text-left transition-all space-y-1.5">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-50 text-teal-700 border border-teal-200 shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                      <path d="m9 12 2 2 4-4" />
+                    </svg>
+                  </span>
+                  <span x-show="ruleType === 'standby_lock'" class="h-2 w-2 rounded-full bg-teal-600 shrink-0"></span>
+                </div>
+                <div class="text-xs font-bold text-slate-900">Standby Vessel Lock</div>
+                <p class="text-[11px] text-slate-500 leading-snug">Protect a vessel exclusively for emergency &amp; offshore standby coverage.</p>
+              </button>
+            </div>
+            {% if form.rule_type.errors %}
+            <p class="text-xs text-rose-700 font-medium">{{ form.rule_type.errors|join:", " }}</p>
+            {% endif %}
+          </div>
+
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-600">Select Enforcement Severity</span>
+              <span class="text-[11px] font-mono uppercase text-slate-500" x-text="severity"></span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {% for val, label in severity_choices %}
+              <button type="button"
+                      @click="pickSeverity('{{ val|escapejs }}')"
+                      :class="severity === '{{ val|escapejs }}' ? '{% if val == "critical" %}border-rose-600 bg-rose-600 text-white{% elif val == "high" %}border-slate-900 bg-slate-900 text-white{% else %}border-teal-600 bg-teal-600 text-white{% endif %} shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'"
+                      class="rounded-xl border p-3 text-left transition-all space-y-0.5">
+                <div class="text-xs font-semibold">{{ label }}</div>
+                <div class="text-[11px] opacity-80">
+                  {% if val == "critical" %}Hard HSE safety lock · immediate stop{% elif val == "high" %}Blocks automated optimizer merges{% else %}Advisory alert for shift supervisors{% endif %}
+                </div>
+              </button>
+              {% endfor %}
+            </div>
+            {% if form.severity.errors %}
+            <p class="text-xs text-rose-700 font-medium">{{ form.severity.errors|join:", " }}</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Step 2: Target Scope (Vessel Menu Cards OR Offshore Corridor Menu Cards) -->
+        <div x-show="step === 2" x-cloak class="space-y-3">
+          <!-- Vessel Selection (Maintenance Hold / Standby Lock) -->
+          <div x-show="isVesselRule" class="space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-600">Select Target Vessel</span>
+              <span class="text-[11px] text-slate-500">Tap any fleet vessel to assign the hold</span>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {% for v in vessels %}
+              <button type="button"
+                      @click="pickVessel('{{ v.pk }}')"
+                      :class="vesselId === '{{ v.pk }}' ? 'border-teal-600 bg-teal-50/90 text-slate-900 ring-1 ring-teal-500/30 shadow-sm' : (vesselHasActiveRule('{{ v.pk }}', ruleType) ? 'border-rose-200 bg-rose-50/40 text-slate-700' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 text-slate-800')"
+                      class="rounded-xl border p-2.5 text-left transition-all space-y-1">
+                <div class="flex items-center justify-between gap-1">
+                  <span class="font-mono font-bold text-xs">{{ v.vessel_id }}</span>
+                  <span x-show="vesselHasActiveRule('{{ v.pk }}', ruleType)"
+                        x-cloak
+                        class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-rose-100 text-rose-800 border border-rose-200">Held</span>
+                  <span x-show="!vesselHasActiveRule('{{ v.pk }}', ruleType)"
+                        class="h-2 w-2 rounded-full {% if v.is_standby_designated %}bg-amber-500{% else %}bg-emerald-500{% endif %} shrink-0"></span>
+                </div>
+                <div class="text-[10px] text-slate-500 truncate">{{ v.vessel_type }}</div>
+                <div class="font-mono tabular-nums text-[11px] font-semibold text-slate-700">
+                  {{ v.passenger_capacity }}p · {{ v.cargo_capacity_t|floatformat:1 }}t
+                </div>
+                <div class="font-mono tabular-nums text-[10px] text-slate-500"
+                     x-text="findVesselMeta('{{ v.pk }}') ? (findVesselMeta('{{ v.pk }}').high_outliers_count + ' high · ' + findVesselMeta('{{ v.pk }}').pending_count + ' queued') : ''"></div>
+              </button>
+              {% endfor %}
+            </div>
+
+            {% if form.vessel.errors %}
+            <p class="text-xs text-rose-700 font-medium">{{ form.vessel.errors|join:", " }}</p>
+            {% endif %}
+          </div>
+
+          <!-- Corridor Selection (Sea-State / Weather Hold) -->
+          <div x-show="!isVesselRule" class="space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-600">Select Offshore Corridor Scope</span>
+              <span class="text-[11px] text-slate-500">Restrict a single destination or all Rough-sea routes</span>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {% for dest_opt in safety_scope_meta.destinations %}
+              <button type="button"
+                      @click="pickDestination('{{ dest_opt.value|escapejs }}')"
+                      :class="destination === '{{ dest_opt.value|escapejs }}' ? 'border-teal-600 bg-teal-50/90 text-slate-900 ring-1 ring-teal-500/30 shadow-sm' : '{% if dest_opt.has_active_weather_hold %}border-rose-200 bg-rose-50/40 text-slate-700{% else %}border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 text-slate-800{% endif %}'"
+                      class="rounded-xl border p-3 text-left transition-all space-y-1">
+                <div class="flex items-center justify-between gap-1.5">
+                  <span class="text-xs font-bold leading-tight">{{ dest_opt.label }}</span>
+                  {% if dest_opt.has_active_weather_hold %}
+                  <span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-rose-100 text-rose-800 border border-rose-200 shrink-0">Active</span>
+                  {% else %}
+                  <span x-show="destination === '{{ dest_opt.value|escapejs }}'" class="h-2 w-2 rounded-full bg-teal-600 shrink-0"></span>
+                  {% endif %}
+                </div>
+                <div class="font-mono tabular-nums text-[11px] text-slate-600">
+                  {{ dest_opt.pending_count }} queued · {{ dest_opt.rough_pending_count }} rough
+                </div>
+                <div class="font-mono tabular-nums text-[10px] text-slate-400">
+                  {{ dest_opt.high_outliers_count }} historical high-burn runs
+                </div>
+              </button>
+              {% endfor %}
+            </div>
+
+            {% if form.destination.errors %}
+            <p class="text-xs text-rose-700 font-medium">{{ form.destination.errors|join:", " }}</p>
+            {% endif %}
+          </div>
+
+          <!-- Inline Duplicate Active Hold Guard -->
+          <div x-show="isDuplicateSelected" x-cloak class="rounded-xl border border-rose-200 bg-rose-50/90 px-3.5 py-2.5 text-xs font-medium text-rose-800 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-rose-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" />
+            </svg>
+            <span>An active rule of this type already exists for the selected target — choose another scope or clear the existing hold first.</span>
+          </div>
+        </div>
+
+        <!-- Step 3: Optional Reason & Role (HTMX+Alpine Settle Safe) -->
+        <div id="optional-hold-details"
+             x-show="step === 3"
+             x-cloak
+             {% if not form.reason.errors and not form.created_by_role.errors %}style="display: none;"{% endif %}
+             :class="{ 'hidden': step !== 3 }"
+             class="{% if not form.reason.errors and not form.created_by_role.errors %}hidden {% endif %}space-y-4">
+          <div class="rounded-xl border border-teal-200 bg-teal-50/75 px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2">
+            <div class="text-xs text-teal-950">
+              <span class="font-semibold">Optional Step · Engineering defaults pre-ready:</span>
+              <span class="text-[11px] text-teal-800 ml-1">Leave reason blank to auto-fill a scope-tailored engineering note.</span>
+            </div>
+            <button type="button"
+                    data-skip-submit
+                    @click="skipOptionalAndSubmit()"
+                    class="btn btn-xs bg-white border border-teal-300 text-teal-900 hover:bg-teal-100">
+              Skip &amp; Submit Now
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <label for="{{ form.created_by_role.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+                Issuing Authority / Role
+              </label>
+              {{ form.created_by_role }}
+              <div class="flex flex-wrap gap-1 pt-0.5">
+                {% for role in role_presets %}
+                <button type="button"
+                        @click="pickRole('{{ role|escapejs }}')"
+                        :class="createdByRole === '{{ role|escapejs }}' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"
+                        class="px-2 py-0.5 rounded-full border text-[10px] font-medium transition-colors">
+                  {{ role }}
+                </button>
+                {% endfor %}
+              </div>
+              {% if form.created_by_role.errors %}
+              <p class="text-xs text-rose-700 font-medium">{{ form.created_by_role.errors|join:", " }}</p>
+              {% endif %}
+            </div>
+
+            <div class="space-y-2">
+              <label for="{{ form.reason.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+                Engineering / HSE Rationale (Optional)
+              </label>
+              {{ form.reason }}
+              <div class="flex flex-wrap gap-1 pt-0.5">
+                <button type="button"
+                        @click="applyReasonPreset('Elevated fuel-burn ratio flagged — hold vessel for propulsion, injector, and hull inspection.')"
+                        class="px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-[10px] font-medium text-slate-700">
+                  Propulsion &amp; Hull Audit
+                </button>
+                <button type="button"
+                        @click="applyReasonPreset('Rough sea-state safety restriction on corridor pending marine weather clearance.')"
+                        class="px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-[10px] font-medium text-slate-700">
+                  Rough Sea Restriction
+                </button>
+                <button type="button"
+                        @click="applyReasonPreset('Reserve vessel for mandatory offshore emergency &amp; medevac standby protection.')"
+                        class="px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-[10px] font-medium text-slate-700">
+                  Emergency Standby Lock
+                </button>
+              </div>
+              {% if form.reason.errors %}
+              <p class="text-xs text-rose-700 font-medium">{{ form.reason.errors|join:", " }}</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Workflow Footer Actions -->
+      <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <button type="button"
+                  x-show="step > 1"
+                  x-cloak
+                  @click="prevStep()"
+                  class="btn btn-outline btn-sm border-slate-300 bg-white text-slate-700 hover:bg-slate-100 gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+            Back
+          </button>
+          <span x-show="step === 1" class="text-xs text-slate-500">
+            Smart engineering defaults pre-filled — skip anytime
+          </span>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button"
+                  data-skip-submit
+                  @click="skipOptionalAndSubmit()"
+                  class="btn btn-ghost btn-sm text-slate-600 hover:text-slate-900 font-medium">
+            Skip optional &amp; submit with defaults
+          </button>
+
+          <button type="button"
+                  x-show="step < 3"
+                  @click="nextStep()"
+                  :disabled="step === 2 && (isDuplicateSelected || (isVesselRule && !vesselId))"
+                  class="btn btn-primary btn-sm gap-1.5">
+            <span>Next Step</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+            </svg>
+          </button>
+
+          <button type="submit"
+                  x-show="step === 3"
+                  x-cloak
+                  :disabled="isDuplicateSelected"
+                  class="btn btn-primary btn-sm gap-2">
+            <span class="htmx-hide-on-request inline-flex items-center gap-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+              Activate HSE Hold
+            </span>
+            <span id="hold-submit-spinner" class="htmx-indicator items-center gap-2">
+              <span class="loading loading-spinner loading-xs"></span>
+              Saving HSE override…
+            </span>
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
