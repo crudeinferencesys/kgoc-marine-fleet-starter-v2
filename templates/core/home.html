@@ -9,336 +9,291 @@
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-  <!-- Band 1: Header Band -->
-  <section class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-    <div>
-      <p class="text-xs font-semibold uppercase tracking-wider text-teal-700">
-        CrudeInference · Offshore Fleet Telemetry
-      </p>
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-1">
+<div class="space-y-3 lg:-my-1">
+  <!-- Band 1: Slim Header Band -->
+  <section data-scroll-section data-scroll-label="Control Tower" class="flex flex-wrap items-center justify-between gap-3">
+    <div class="min-w-0">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-[11px] font-semibold uppercase tracking-wider text-teal-700">
+          CrudeInference · Offshore Fleet Telemetry
+        </span>
+        <span class="text-slate-300 hidden sm:inline" aria-hidden="true">·</span>
+        <span class="text-xs text-slate-500 hidden sm:inline">
+          {{ metrics.total_vessels }}-vessel KJO fleet · {{ metrics.historical_trips }} historical trips
+        </span>
+      </div>
+      <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 mt-0.5">
         KGOC Marine Fleet Control Tower
       </h1>
-      <p class="text-sm text-slate-600 mt-1 max-w-2xl">
-        Real-time vessel utilization, consolidation savings opportunity, and offshore HSE fuel oversight across the {{ metrics.total_vessels }}-vessel KJO fleet.
-      </p>
     </div>
 
-    <div class="flex flex-wrap items-center gap-2.5 shrink-0">
-      <a href="{% url 'trips:index' %}" class="btn btn-primary btn-sm gap-2">
+    <div class="flex flex-wrap items-center gap-2 shrink-0">
+      <a href="{% url 'trips:index' %}" class="btn btn-primary btn-sm gap-1.5">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M12 5v14" /><path d="M5 12h14" />
         </svg>
         Book Shift Trip
       </a>
-      <a href="{% url 'optimizer:index' %}" class="btn btn-outline btn-sm border-slate-300 text-slate-700 hover:bg-slate-100 hover:border-slate-400 gap-2">
+      <a href="{% url 'optimizer:index' %}" class="btn btn-outline btn-sm border-slate-300 text-slate-700 hover:bg-slate-100 hover:border-slate-400 gap-1.5">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-teal-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
         </svg>
         Open Optimizer
       </a>
     </div>
   </section>
 
-  <!-- Band 2: 4 KPI Telemetry Cards -->
-  <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  <!-- Band 2: Compact 4-KPI Telemetry Strip -->
+  <section data-scroll-section data-scroll-label="Fleet KPIs" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
     <!-- KPI 1: Fleet Utilization -->
-    <div class="surface-card kpi-accent-teal p-4">
+    <div class="surface-card kpi-accent-teal p-3">
       <div class="flex items-center justify-between gap-2">
         <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Fleet Utilization</span>
-        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-50 text-teal-700">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-teal-50 text-teal-700">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1 .6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1" />
             <path d="M19.38 20A11.6 11.6 0 0 0 21 14l-9-4-9 4c0 2.9.94 5.34 2.81 7.76" />
-            <path d="M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6" />
           </svg>
         </span>
       </div>
-      <div class="mt-2 flex items-baseline gap-1.5">
-        <span class="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-slate-900">{{ metrics.avg_utilization_pct|floatformat:1 }}</span>
+      <div class="mt-1 flex items-baseline gap-1">
+        <span class="text-2xl font-bold font-mono tabular-nums text-slate-900">{{ metrics.avg_utilization_pct|floatformat:1 }}</span>
         <span class="text-xs font-semibold text-slate-500">%</span>
       </div>
-      <p class="mt-1 text-xs text-slate-500 font-mono tabular-nums">
-        {{ metrics.avg_pax_utilization_pct|floatformat:1 }}% avg pax load · {{ metrics.total_vessels }} vessels · {{ metrics.historical_trips }} trips
+      <p class="mt-0.5 text-[11px] text-slate-500 font-mono tabular-nums truncate">
+        {{ metrics.avg_pax_utilization_pct|floatformat:1 }}% pax · {{ metrics.total_vessels }} vessels · {{ metrics.historical_trips }} trips
       </p>
     </div>
 
     <!-- KPI 2: Half-Empty Sailings -->
-    <div class="surface-card kpi-accent-amber p-4">
+    <div class="surface-card kpi-accent-amber p-3">
       <div class="flex items-center justify-between gap-2">
         <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Half-Empty Sailings</span>
-        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-amber-50 text-amber-700">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
             <path d="M12 9v4" /><path d="M12 17h.01" />
           </svg>
         </span>
       </div>
-      <div class="mt-2 flex items-baseline gap-1.5">
-        <span class="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-amber-700">{{ metrics.half_empty_count|floatformat:"0g" }}</span>
+      <div class="mt-1 flex items-baseline gap-1">
+        <span class="text-2xl font-bold font-mono tabular-nums text-amber-700">{{ metrics.half_empty_count|floatformat:"0g" }}</span>
         <span class="text-xs font-semibold text-slate-500">sailings</span>
       </div>
-      <p class="mt-1 text-xs text-slate-500 font-mono tabular-nums">
-        {{ metrics.half_empty_pct|floatformat:1 }}% below 50% vessel capacity
+      <p class="mt-0.5 text-[11px] text-slate-500 font-mono tabular-nums truncate">
+        {{ metrics.half_empty_pct|floatformat:1 }}% below 50% capacity
       </p>
     </div>
 
     <!-- KPI 3: Est. 90-Day Opportunity -->
-    <div class="surface-card kpi-accent-emerald p-4">
+    <div class="surface-card kpi-accent-emerald p-3">
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Est. 90-Day Opportunity</span>
-        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Est. 90-Day Savings</span>
+        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
         </span>
       </div>
-      <div class="mt-2 flex items-baseline gap-1.5">
-        <span class="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-emerald-700">{{ metrics.backtest_kwd_saved|floatformat:"0g" }}</span>
+      <div class="mt-1 flex items-baseline gap-1">
+        <span class="text-2xl font-bold font-mono tabular-nums text-emerald-700">{{ metrics.backtest_kwd_saved|floatformat:"0g" }}</span>
         <span class="text-xs font-semibold text-slate-500">KWD</span>
+        <span class="text-[10px] font-medium text-slate-400">· mock</span>
       </div>
-      <p class="mt-1 text-xs text-slate-500 font-mono tabular-nums">
-        {{ metrics.backtest_trips_eliminated|floatformat:"0g" }} trips eliminated · {{ metrics.backtest_fuel_saved_l|floatformat:"0g" }} L diesel · {{ metrics.backtest_co2_tonnes|floatformat:1 }} t CO₂ avoided
+      <p class="mt-0.5 text-[11px] text-slate-500 font-mono tabular-nums truncate" title="Mock Benchmark Assumptions">
+        {{ metrics.backtest_trips_eliminated|floatformat:"0g" }} merges · {{ metrics.backtest_fuel_saved_l|floatformat:"0g" }} L · {{ metrics.backtest_co2_tonnes|floatformat:1 }} t CO₂
       </p>
-      <p class="mt-0.5 text-[11px] text-slate-400">Mock Benchmark Assumptions</p>
     </div>
 
     <!-- KPI 4: HSE Holds & Fuel Flags -->
-    <div class="surface-card kpi-accent-rose p-4">
+    <div class="surface-card kpi-accent-rose p-3">
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">HSE Holds &amp; Fuel Flags</span>
-        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50 text-rose-700">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">HSE &amp; Fuel Flags</span>
+        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-rose-50 text-rose-700">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
             <path d="M12 8v4" /><path d="M12 16h.01" />
           </svg>
         </span>
       </div>
-      <div class="mt-2 flex items-baseline gap-1.5">
-        <span class="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-rose-700">{{ metrics.active_hse_overrides_count }}</span>
+      <div class="mt-1 flex items-baseline gap-1">
+        <span class="text-2xl font-bold font-mono tabular-nums text-rose-700">{{ metrics.active_hse_overrides_count }}</span>
         <span class="text-xs font-semibold text-slate-500">active holds</span>
       </div>
-      <p class="mt-1 text-xs text-slate-500 font-mono tabular-nums">
-        {{ metrics.severe_fuel_anomalies_count }} high fuel outliers · {{ metrics.missing_fuel_logs_count }} missing logs
+      <p class="mt-0.5 text-[11px] text-slate-500 font-mono tabular-nums truncate">
+        {{ metrics.severe_fuel_anomalies_count }} high outliers · {{ metrics.missing_fuel_logs_count }} missing logs
       </p>
     </div>
   </section>
 
-  <!-- Band 3: Workspace Grid -->
-  <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-    <!-- Left Column: Chart + Productive vs Idle Breakdown -->
-    <div class="lg:col-span-7 space-y-6">
+  <!-- Band 3: Single-Screen 12-Col Workspace -->
+  <section data-scroll-section data-scroll-label="Fleet Analytics & Modules" class="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
+    <!-- Left Column: Chart + Compact Productive vs Idle Strip -->
+    <div class="lg:col-span-7 flex flex-col gap-3">
       <!-- Chart.js 4 Vessel Utilization vs Trip Count Card -->
-      <div class="surface-card p-5">
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+      <div class="surface-card p-3.5 flex-1 flex flex-col justify-between">
+        <div class="flex items-center justify-between gap-2 mb-2">
           <div>
-            <h2 class="text-base font-semibold text-slate-900">90-Day Vessel Utilization vs Trip Count</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Average load utilization (%) compared against completed sailings per vessel</p>
+            <h2 class="text-sm font-semibold text-slate-900">90-Day Vessel Utilization vs Trip Count</h2>
+            <p class="text-[11px] text-slate-500">Avg load (%) vs completed sailings (CB-01–CB-08)</p>
           </div>
-          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-800 border border-teal-200 font-mono tabular-nums">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-teal-50 text-teal-800 border border-teal-200 font-mono tabular-nums whitespace-nowrap shrink-0">
             {{ metrics.historical_trips }} historical runs
           </span>
         </div>
 
         {{ metrics.vessel_chart_data|json_script:"control-tower-vessel-chart" }}
-        <div class="relative h-64 w-full">
+        <div class="relative h-48 lg:h-[210px] w-full">
           <canvas id="controlTowerVesselChart"></canvas>
         </div>
       </div>
 
-      <!-- Productive Onsite vs Avoidable Idle Time Breakdown Card -->
-      <div class="surface-card p-5 space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 class="text-base font-semibold text-slate-900">Productive Onsite vs Avoidable Idle Time</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Time spent working offshore vs nonproductive standby burning fuel at platforms</p>
-          </div>
-          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono tabular-nums">
-            {{ metrics.productive_share_pct|floatformat:1 }}% productive share
-          </span>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div class="rounded-xl bg-teal-50/60 border border-teal-200/70 p-3.5">
-            <div class="text-[11px] font-semibold uppercase tracking-wider text-teal-800">Productive Onsite</div>
-            <div class="mt-1 flex items-baseline gap-1">
-              <span class="text-xl font-bold font-mono tabular-nums text-slate-900">{{ metrics.productive_onsite_hours|floatformat:"1g" }}</span>
-              <span class="text-xs font-medium text-slate-500">hrs</span>
-            </div>
-          </div>
-
-          <div class="rounded-xl bg-amber-50/70 border border-amber-200/80 p-3.5">
-            <div class="text-[11px] font-semibold uppercase tracking-wider text-amber-800">Avoidable Idle</div>
-            <div class="mt-1 flex items-baseline gap-1">
-              <span class="text-xl font-bold font-mono tabular-nums text-amber-800">{{ metrics.avoidable_idle_hours|floatformat:"1g" }}</span>
-              <span class="text-xs font-medium text-slate-500">hrs</span>
-            </div>
-          </div>
-
-          <div class="rounded-xl bg-slate-50 border border-slate-200/80 p-3.5">
-            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-600">Idle Fuel Burned</div>
-            <div class="mt-1 flex items-baseline gap-1">
-              <span class="text-xl font-bold font-mono tabular-nums text-slate-900">{{ metrics.idle_fuel_liters|floatformat:"0g" }}</span>
-              <span class="text-xs font-medium text-slate-500">L</span>
-            </div>
+      <!-- Compact Productive Onsite vs Avoidable Idle Strip -->
+      <div class="surface-card px-3.5 py-2.5 space-y-1.5">
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <span class="font-semibold text-slate-900">Productive Onsite vs Avoidable Idle</span>
+          <div class="flex flex-wrap items-center gap-3 font-mono tabular-nums text-[11px]">
+            <span class="text-teal-700 font-semibold">{{ metrics.productive_onsite_hours|floatformat:"1g" }} h onsite</span>
+            <span class="text-amber-700 font-semibold">{{ metrics.avoidable_idle_hours|floatformat:"1g" }} h idle</span>
+            <span class="text-slate-600">{{ metrics.idle_fuel_liters|floatformat:"0g" }} L idle fuel</span>
+            <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium">
+              {{ metrics.productive_share_pct|floatformat:1 }}% productive
+            </span>
           </div>
         </div>
-
-        <div class="space-y-1.5">
-          <div class="flex items-center justify-between text-xs text-slate-600 font-mono tabular-nums">
-            <span>Onsite share ({{ metrics.productive_share_pct|floatformat:1 }}%)</span>
-            <span>{{ metrics.productive_onsite_hours|floatformat:1 }} h / {{ metrics.avoidable_idle_hours|floatformat:1 }} h idle</span>
-          </div>
-          <div class="w-full h-2.5 rounded-full bg-amber-100 overflow-hidden">
-            <div class="h-full rounded-full bg-teal-600" style="width: {{ metrics.productive_share_pct }}%"></div>
-          </div>
+        <div class="w-full h-2 rounded-full bg-amber-100 overflow-hidden">
+          <div class="h-full rounded-full bg-teal-600" style="width: {{ metrics.productive_share_pct }}%"></div>
         </div>
       </div>
     </div>
 
-    <!-- Right Column: 3 Feature Launch Cards + Live Telemetry Footer -->
-    <div class="lg:col-span-5 space-y-4">
-      <!-- Launch Card 01: Trips & Utilization Ledger -->
-      <a href="{% url 'trips:index' %}" class="block surface-card surface-card-hover p-5 group">
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex items-center gap-2.5">
-            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 text-teal-700 font-mono text-xs font-bold border border-teal-200/70">01</span>
+    <!-- Right Column: 2x2 Feature Launch Grid + Compact Telemetry/HSE Bar -->
+    <div class="lg:col-span-5 flex flex-col gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
+        <!-- Card 01: Trips & Utilization -->
+        <a href="{% url 'trips:index' %}" class="surface-card surface-card-hover p-3.5 flex flex-col justify-between group">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="flex h-7 w-7 items-center justify-center rounded-md bg-teal-50 text-teal-700 font-mono text-[11px] font-bold border border-teal-200/70">01</span>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-900 border border-amber-200 font-mono tabular-nums">
+                {{ metrics.pending_trips }} pending
+              </span>
+            </div>
             <div>
-              <h3 class="text-base font-semibold text-slate-900 group-hover:text-teal-700 transition-colors">
-                Trips &amp; Utilization Ledger
+              <h3 class="text-sm font-semibold text-slate-900 group-hover:text-teal-700 transition-colors">
+                Trips &amp; Utilization
               </h3>
-              <p class="text-xs text-slate-500">Log live shift requests, filter fleet runs, and spot half-empty sailings</p>
+              <p class="text-[11px] text-slate-500 mt-0.5 line-clamp-2">
+                Log shift requests and spot half-empty sailings.
+              </p>
             </div>
           </div>
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-900 border border-amber-200 font-mono tabular-nums shrink-0">
-            {{ metrics.pending_trips }} pending
-          </span>
-        </div>
-        <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-          <span class="text-slate-500 font-mono tabular-nums">{{ metrics.historical_trips }} completed · {{ metrics.half_empty_count }} half-empty</span>
-          <span class="font-semibold text-teal-700 inline-flex items-center gap-1">
-            Open Ledger
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
-            </svg>
-          </span>
-        </div>
-      </a>
+          <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <span class="text-slate-500 font-mono tabular-nums">{{ metrics.half_empty_count }} &lt;50%</span>
+            <span class="font-semibold text-teal-700">Open →</span>
+          </div>
+        </a>
 
-      <!-- Launch Card 02: Dispatch Consolidation Optimizer -->
-      <a href="{% url 'optimizer:index' %}" class="block surface-card surface-card-hover p-5 group">
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex items-center gap-2.5">
-            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 text-teal-700 font-mono text-xs font-bold border border-teal-200/80">02</span>
+        <!-- Card 02: Dispatch Optimizer -->
+        <a href="{% url 'optimizer:index' %}" class="surface-card surface-card-hover p-3.5 flex flex-col justify-between group">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="flex h-7 w-7 items-center justify-center rounded-md bg-teal-50 text-teal-700 font-mono text-[11px] font-bold border border-teal-200/70">02</span>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono tabular-nums">
+                {{ metrics.backtest_trips_eliminated }} merges
+              </span>
+            </div>
             <div>
-              <h3 class="text-base font-semibold text-slate-900 group-hover:text-teal-700 transition-colors">
-                Dispatch Consolidation Optimizer
+              <h3 class="text-sm font-semibold text-slate-900 group-hover:text-teal-700 transition-colors">
+                Dispatch Optimizer
               </h3>
-              <p class="text-xs text-slate-500">Merge overlapping pending runs under capacity, window, and HSE limits</p>
+              <p class="text-[11px] text-slate-500 mt-0.5 line-clamp-2">
+                Consolidate overlapping runs under HSE limits.
+              </p>
             </div>
           </div>
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono tabular-nums shrink-0">
-            {{ metrics.backtest_trips_eliminated }} merges
-          </span>
-        </div>
-        <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-          <span class="text-slate-500 font-mono tabular-nums">{{ metrics.approved_plans_count }} approved plans · {{ metrics.backtest_kwd_saved|floatformat:"0g" }} KWD 90d est.</span>
-          <span class="font-semibold text-teal-700 inline-flex items-center gap-1">
-            Open Optimizer
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
-            </svg>
-          </span>
-        </div>
-      </a>
+          <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <span class="text-slate-500 font-mono tabular-nums">{{ metrics.approved_plans_count }} plans</span>
+            <span class="font-semibold text-teal-700">Open →</span>
+          </div>
+        </a>
 
-      <!-- Launch Card 03: Safety & Fuel Anomaly Guard -->
-      <a href="{% url 'safety:index' %}" class="block surface-card surface-card-hover p-5 group">
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex items-center gap-2.5">
-            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-700 font-mono text-xs font-bold border border-rose-200/80">03</span>
+        <!-- Card 03: Safety & Fuel Guard -->
+        <a href="{% url 'safety:index' %}" class="surface-card surface-card-hover p-3.5 flex flex-col justify-between group">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="flex h-7 w-7 items-center justify-center rounded-md bg-rose-50 text-rose-700 font-mono text-[11px] font-bold border border-rose-200/80">03</span>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose-50 text-rose-800 border border-rose-200 font-mono tabular-nums">
+                {{ metrics.active_hse_overrides_count }} holds · {{ metrics.severe_fuel_anomalies_count }} flags
+              </span>
+            </div>
             <div>
-              <h3 class="text-base font-semibold text-slate-900 group-hover:text-teal-700 transition-colors">
-                Safety &amp; Fuel Anomaly Guard
+              <h3 class="text-sm font-semibold text-slate-900 group-hover:text-teal-700 transition-colors">
+                Safety &amp; Fuel Guard
               </h3>
-              <p class="text-xs text-slate-500">Enforce weather/standby overrides and flag abnormal diesel burn</p>
+              <p class="text-[11px] text-slate-500 mt-0.5 line-clamp-2">
+                Enforce HSE locks and flag diesel outliers.
+              </p>
             </div>
           </div>
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200 font-mono tabular-nums shrink-0">
-            {{ metrics.active_hse_overrides_count }} holds · {{ metrics.severe_fuel_anomalies_count }} outliers
-          </span>
-        </div>
-        <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-          <span class="text-slate-500 font-mono tabular-nums">{{ metrics.low_fuel_anomalies_count }} low burn · {{ metrics.missing_fuel_logs_count }} missing logs</span>
-          <span class="font-semibold text-teal-700 inline-flex items-center gap-1">
-            Open Guard
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
-            </svg>
-          </span>
-        </div>
-      </a>
+          <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <span class="text-slate-500 font-mono tabular-nums">{{ metrics.missing_fuel_logs_count }} missing</span>
+            <span class="font-semibold text-teal-700">Open →</span>
+          </div>
+        </a>
 
-      <!-- Launch Card 04: Standalone Bonus AI Dispatch Co-Pilot -->
-      <a href="{% url 'core:copilot:index' %}" class="block ai-copilot-surface surface-card-hover p-5 group">
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex items-center gap-2.5">
-            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-mono text-xs font-bold">04</span>
+        <!-- Card 04: Standalone Bonus AI Dispatch Co-Pilot -->
+        <a href="{% url 'core:copilot:index' %}" class="ai-copilot-surface surface-card-hover p-3.5 flex flex-col justify-between group">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-600 text-white font-mono text-[11px] font-bold">04</span>
+              {% if ai_configured %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-600 text-white">
+                Bonus AI
+              </span>
+              {% else %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-900 border border-amber-200">
+                Fallback
+              </span>
+              {% endif %}
+            </div>
             <div>
-              <h3 class="text-base font-semibold text-indigo-950 group-hover:text-indigo-700 transition-colors">
+              <h3 class="text-sm font-semibold text-indigo-950 group-hover:text-indigo-700 transition-colors">
                 AI Dispatch Co-Pilot
               </h3>
-              <p class="text-xs text-slate-600">Standalone Gemini 4 shift risk review, HSE recommendations, and handover briefings</p>
+              <p class="text-[11px] text-slate-600 mt-0.5 line-clamp-2">
+                Gemini 4 merge risk review &amp; handover brief.
+              </p>
             </div>
           </div>
-          {% if ai_configured %}
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-600 text-white shrink-0">
-            Bonus AI · Configured
-          </span>
-          {% else %}
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-900 border border-amber-200 shrink-0">
-            Fallback Ready
-          </span>
-          {% endif %}
-        </div>
-        <div class="mt-3 pt-3 border-t border-indigo-200/60 flex items-center justify-between text-xs">
-          <span class="text-indigo-900/75 font-mono tabular-nums">{{ gemini_model }} · {{ metrics.pending_trips }} live queue</span>
-          <span class="font-semibold text-indigo-700 inline-flex items-center gap-1">
-            Open Co-Pilot
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
-            </svg>
-          </span>
-        </div>
-      </a>
+          <div class="mt-2.5 pt-2 border-t border-indigo-200/60 flex items-center justify-between text-[11px]">
+            <span class="text-indigo-900/75 font-mono truncate">{{ gemini_model }}</span>
+            <span class="font-semibold text-indigo-700 shrink-0">Open →</span>
+          </div>
+        </a>
+      </div>
 
-      <!-- Discreet Live Telemetry & Active SafetyOverride Preview -->
-      <div class="surface-card p-4 space-y-3">
-        <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
-          <span class="font-semibold uppercase tracking-wider text-slate-500 text-[11px]">Active Telemetry &amp; HSE Locks</span>
-          <div class="flex items-center gap-1.5 font-mono text-[11px]">
-            <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">DB: {{ db_engine }}</span>
-            <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200">{{ gemini_model }}</span>
+      <!-- Compact Telemetry & Active HSE Lock Strip -->
+      <div class="surface-card px-3.5 py-2.5 space-y-1.5">
+        <div class="flex items-center justify-between gap-2 text-[11px]">
+          <span class="font-semibold uppercase tracking-wider text-slate-500">Active Telemetry &amp; HSE</span>
+          <div class="flex items-center gap-1.5 font-mono">
+            <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">DB: {{ db_engine }}</span>
+            <span class="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200">{{ gemini_model }}</span>
           </div>
         </div>
-
         {% if metrics.active_hse_overrides %}
-        <div class="space-y-2">
-          {% for override in metrics.active_hse_overrides %}
-          <div class="rounded-lg border border-rose-200 bg-rose-50/70 border-l-4 border-l-rose-600 px-3 py-2 text-xs">
-            <div class="flex items-center justify-between gap-2">
-              <span class="font-semibold text-rose-900">
-                {{ override.get_rule_type_display }}
-                {% if override.vessel %}· <span class="font-mono">{{ override.vessel.vessel_id }}</span>{% endif %}
-              </span>
-              <span class="uppercase font-mono text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-800">{{ override.severity }}</span>
-            </div>
-            <p class="text-slate-700 mt-0.5 line-clamp-2">{{ override.reason }}</p>
+          {% with override=metrics.active_hse_overrides.0 %}
+          <div class="rounded-lg border border-rose-200 bg-rose-50/70 border-l-4 border-l-rose-600 px-2.5 py-1.5 flex items-center justify-between gap-2 text-[11px]">
+            <span class="truncate text-slate-700">
+              <strong class="text-rose-900">{{ override.get_rule_type_display }}{% if override.vessel %} · <span class="font-mono">{{ override.vessel.vessel_id }}</span>{% endif %}:</strong>
+              {{ override.reason }}
+            </span>
+            <span class="uppercase font-mono text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 shrink-0">{{ override.severity }}</span>
           </div>
-          {% endfor %}
-        </div>
+          {% endwith %}
         {% else %}
-        <p class="text-xs text-slate-500">No active HSE overrides recorded across the fleet.</p>
+          <p class="text-[11px] text-slate-500">No active HSE overrides across the fleet.</p>
         {% endif %}
       </div>
     </div>
@@ -397,9 +352,11 @@
         plugins: {
           legend: {
             labels: {
+              boxWidth: 10,
+              padding: 10,
               font: {
                 family: "'Plus Jakarta Sans', sans-serif",
-                size: 12,
+                size: 11,
               },
             },
           },
@@ -418,20 +375,37 @@
         scales: {
           x: {
             grid: { display: false },
+            ticks: {
+              font: {
+                family: "'JetBrains Mono', monospace",
+                size: 10,
+              },
+            },
           },
           y: {
-            beginAtZero: true,
+            position: 'left',
+            min: 0,
             max: 100,
-            title: { display: true, text: 'Avg Utilization (%)' },
             grid: { color: CHART_PALETTE.grid },
             border: { dash: [4, 4], display: false },
+            ticks: {
+              callback: (v) => `${v}%`,
+              font: {
+                family: "'JetBrains Mono', monospace",
+                size: 10,
+              },
+            },
           },
           y1: {
-            beginAtZero: true,
             position: 'right',
-            title: { display: true, text: 'Completed Trips' },
+            min: 0,
             grid: { drawOnChartArea: false },
-            border: { display: false },
+            ticks: {
+              font: {
+                family: "'JetBrains Mono', monospace",
+                size: 10,
+              },
+            },
           },
         },
       },

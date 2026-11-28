@@ -48,11 +48,14 @@
 
 ---
 
-## 4. Standard 3-Band Page Anatomy
-Every slice (`/`, `/trips/`, `/optimizer/`, `/safety/`) follows this structure inside `{% block content %}`:
-1. **Band 1 — Header Band:** Eyebrow (`text-xs font-semibold uppercase tracking-wider text-teal-700`) + `h1` (`text-2xl font-bold tracking-tight text-slate-900`) + 1-line operational subtitle on left; primary CTA / status pill on right (`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6`).
-2. **Band 2 — KPI Strip (4 Cards):** `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6`.
-3. **Band 3 — Workspace Grid:** `grid grid-cols-1 lg:grid-cols-12 gap-6` (typically `lg:col-span-8` primary table/solver + `lg:col-span-4` action form / Gemini Co-Pilot sidebar).
+## 4. Standard 3-Band Page Anatomy & Zero-Scroll Desktop Contract
+Every slice (`/`, `/trips/`, `/optimizer/`, `/safety/`, `/copilot/`) follows this structure inside `{% block content %}`:
+1. **Band 1 — Header Band:** Eyebrow (`text-xs font-semibold uppercase tracking-wider text-teal-700`) + `h1` (`text-xl sm:text-2xl font-bold tracking-tight text-slate-900`) + 1-line operational subtitle on left; primary CTA / status pill on right (`flex flex-wrap items-center justify-between gap-2 mb-3`).
+2. **Band 2 — KPI Strip (4 Cards):** `grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3` with compact `p-3` KPI cards.
+3. **Band 3 — Workspace Grid:** `grid grid-cols-1 lg:grid-cols-12 gap-3.5` (typically `lg:col-span-7` or `lg:col-span-8` primary chart/table/solver + `lg:col-span-5` or `lg:col-span-4` 2×2 cards / action form / Gemini Co-Pilot sidebar).
+
+> **Zero-Scroll Single-Viewport Desktop Contract (`>= 1280×760`):**
+> Every operational page — and **especially the Command Center (`/`)** — MUST fit cleanly within a single desktop viewport (`document.documentElement.scrollHeight <= window.innerHeight` at `1280×800` and `1440×900`) with **zero page-level vertical scrolling**. Keep total workspace height within `~640px` using compact headers (`~48px`), `p-3` KPI strips (`~96px`), `h-48`–`h-52` Chart.js wrappers, 2×2 card grids or Alpine tabs for secondary views, and bounded internal scroll (`max-h-[...] overflow-y-auto`) ONLY inside dense tables/lists when needed.
 
 ---
 
@@ -217,8 +220,8 @@ const CHART_PALETTE = {
 
 ## 6. Cutting-Edge Interaction Patterns (Scroll, Smart Forms, Discovery, Tactical Map, Quiet Cockpit)
 
-### 1. Scroll-Aware Sections (`base.html` Topbar Progress + Section-Spy)
-`templates/base.html` automatically renders a `2.5px` topbar scroll progress hairline (`animation-timeline: scroll()`), a dynamic depth + section pill (`#topbar-scroll-context`), and a back-to-top button. Tag major page bands with `data-scroll-section` and `data-scroll-label`, and apply `.scroll-reveal` on secondary cards below the fold:
+### 1. Scroll-Aware Sections (`base.html` Mobile/Overflow Fallback)
+`templates/base.html` provides a `2.5px` topbar scroll progress hairline (`animation-timeline: scroll()`), a dynamic depth + section pill (`#topbar-scroll-context`), and a back-to-top button as graceful fallbacks for mobile or narrow viewports. Desktop pages (`>= 1280×760`) should remain zero-scroll above the fold; tag major page bands with `data-scroll-section` and `data-scroll-label`, and apply `.scroll-reveal` only if a secondary band sits below the fold on narrow screens:
 ```html
 <section id="fleet-map" data-scroll-section data-scroll-label="Offshore Map" class="surface-card p-5 scroll-reveal">
   ...
@@ -273,6 +276,7 @@ Because the KJO dataset uses named offshore hubs (`Marine Base` → `Platform A/
 ---
 
 ## 7. Anti-Patterns Checklist (Do Not Ship)
+- Do **not** let desktop pages (`>= 1280×760`) overflow vertically into full-page scrolling — keep Control Tower (`/`) and core workspaces zero-scroll above the fold (use tabs, 2×2 grids, compact spacing, and bounded table scroll if needed).
 - Do **not** leave starter/developer copy (`Teammate A`, `apps/trips/`, `Ready for Feature 1...`) in final slice templates.
 - Do **not** add dark mode toggles, unrequested login screens, or standalone static pages.
 - Do **not** use emojis anywhere in the UI (use inline stroke SVGs).
