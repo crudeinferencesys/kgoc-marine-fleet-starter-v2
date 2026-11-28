@@ -15,9 +15,10 @@
   - `{% block content %}` — Main 3-band workspace
   - `{% block extra_scripts %}` — Page-specific Chart.js / Alpine scripts
 - **Preloaded Utility Classes in `templates/base.html`:**
-  - `.surface-card`, `.surface-card-hover`
+  - `.surface-card`, `.surface-card-hover`, `.scroll-reveal` (progressive-enhancement entry motion via `animation-timeline: view()`), `[data-scroll-section]` (`scroll-margin-top` + automatic topbar section-spy + scroll progress hairline)
   - `.kpi-accent-teal`, `.kpi-accent-emerald`, `.kpi-accent-amber`, `.kpi-accent-rose`, `.kpi-accent-indigo`
   - `.ai-copilot-surface` (gradient surface reserved strictly for Gemini 4 Co-Pilot panels)
+  - `.field-control`, `.field-error-msg`, `.visually-hidden` (calm `:user-invalid` post-interaction form validation + ARIA sync)
   - `.tabular-nums`, `.htmx-indicator`, `.htmx-hide-on-request`, `.htmx-fade-in`
 
 ---
@@ -214,7 +215,64 @@ const CHART_PALETTE = {
 
 ---
 
-## 6. Anti-Patterns Checklist (Do Not Ship)
+## 6. Cutting-Edge Interaction Patterns (Scroll, Smart Forms, Discovery, Tactical Map, Quiet Cockpit)
+
+### 1. Scroll-Aware Sections (`base.html` Topbar Progress + Section-Spy)
+`templates/base.html` automatically renders a `2.5px` topbar scroll progress hairline (`animation-timeline: scroll()`), a dynamic depth + section pill (`#topbar-scroll-context`), and a back-to-top button. Tag major page bands with `data-scroll-section` and `data-scroll-label`, and apply `.scroll-reveal` on secondary cards below the fold:
+```html
+<section id="fleet-map" data-scroll-section data-scroll-label="Offshore Map" class="surface-card p-5 scroll-reveal">
+  ...
+</section>
+```
+
+### 2. One-Page Progressive Input Forms (Smart Defaults + Remaining Counter + Skip Optional)
+Keep user input on a single screen: pre-fill probable operational defaults (`Flexible Window: Yes`, `Weather: Calm`, `Priority: Routine`), show a live Alpine counter of remaining required inputs + load preview, place optional details inside `<details>` with an explicit **Use defaults & submit** / **Skip optional** exit hatch, and use `.field-control` for calm `:user-invalid` validation:
+```html
+<form x-data="{ dest: '', pax: 6, cap: 20, showOptional: false, get remaining() { return (this.dest ? 0 : 1) + (this.pax >= 0 ? 0 : 1); } }">
+  <div class="flex items-center justify-between text-xs mb-3">
+    <span class="font-medium text-slate-600"
+          x-text="remaining === 0 ? 'Ready · Est. ' + Math.round((pax / cap) * 100) + '% load' : remaining + ' decision remaining'"></span>
+    <span class="font-mono tabular-nums text-amber-700" x-show="pax / cap < 0.5">Half-empty (&lt;50%)</span>
+  </div>
+  <!-- Place format hints above the input; never flash red while typing -->
+  <label for="id_dest" class="block text-xs font-semibold text-slate-700">Destination *</label>
+  <span id="dest-hint" class="block text-[11px] text-slate-500 mb-1">Select offshore platform or terminal</span>
+  <select id="id_dest" name="destination" x-model="dest" required aria-describedby="dest-hint" data-error="dest-error"
+          class="select select-bordered select-sm w-full field-control">...</select>
+  <p id="dest-error" class="field-error-msg">Choose a destination before logging the trip.</p>
+
+  <details class="mt-3 rounded-lg bg-slate-50 border border-slate-200/80 p-3" :open="showOptional">
+    <summary class="cursor-pointer text-xs font-medium text-slate-600 select-none">+ Optional timing window &amp; dispatcher notes (defaults applied)</summary>
+    <div class="mt-3 space-y-2"><!-- Optional fields --></div>
+  </details>
+  <div class="mt-4 flex items-center justify-between gap-2">
+    <button type="submit" class="btn btn-ghost btn-xs text-slate-500">Skip optional &amp; submit</button>
+    <button type="submit" class="btn btn-primary btn-sm">Log Trip Request</button>
+  </div>
+</form>
+```
+
+### 3. Gaming-Inspired Complex Discovery (Preset Chips + Facets + Slide-Over Inspector)
+Avoid deep dropdown trees for the 988-trip ledger. Pair 1-click **DIM-style saved filter presets** (with live counts) and removable active-filter chips with a right-side **Alpine Slide-Over Inspector** (`TR-00012`) so users never lose table scroll position:
+```html
+<div class="flex flex-wrap items-center gap-1.5 mb-3">
+  <button hx-get="{% url 'trips:index' %}?preset=all" class="btn btn-xs rounded-full">All <span class="font-mono tabular-nums">988</span></button>
+  <button hx-get="{% url 'trips:index' %}?preset=pending" class="btn btn-xs rounded-full bg-teal-50 text-teal-800 border-teal-200">Pending Queue <span class="font-mono tabular-nums">12</span></button>
+  <button hx-get="{% url 'trips:index' %}?preset=half_empty" class="btn btn-xs rounded-full bg-amber-50 text-amber-900 border-amber-200">Half-Empty &lt;50% <span class="font-mono tabular-nums">616</span></button>
+  <button hx-get="{% url 'trips:index' %}?preset=outliers" class="btn btn-xs rounded-full bg-rose-50 text-rose-800 border-rose-200">Fuel Outliers <span class="font-mono tabular-nums">22</span></button>
+</div>
+```
+
+### 4. Interactive KJO Offshore Tactical Map (SVG Radar Plot + Layer Toggles)
+Because the KJO dataset uses named offshore hubs (`Marine Base` → `Platform A/B/C`, `Offshore Terminal`, `Maintenance Area`) and `distance_nm` rather than live AIS GPS coordinates, build zero-latency inline SVG radar plots (`#0A1628` desaturated chart canvas, `10 / 25 / 40 nm` range rings, route arcs, vessel status halos, Windy-style `Weather / HSE Holds` toggle, and click-node-to-filter HTMX triggers) — clearly labeled as a schematic mock plot.
+
+### 5. Quiet-by-Default ("Dark Cockpit") Dashboard Discipline
+- Keep nominal operational rows (`Normal` fuel, `Calm` sea, `Available`) visually quiet in neutral slate/white so **only exceptions and savings opportunities pop** (`Amber` half-empty waste, `Rose` fuel outliers / active HSE holds, `Emerald` verified KWD/CO₂ savings, `Indigo` Gemini 4 Co-Pilot).
+- Always pair semantic color with an inline stroke SVG icon + explicit label (`2.07x · Investigate Fuel`, `CB-07 Standby Lock`), and display an inline impact summary right before committing persisted actions (`Approve & Save Plan`, `Activate Hold`).
+
+---
+
+## 7. Anti-Patterns Checklist (Do Not Ship)
 - Do **not** leave starter/developer copy (`Teammate A`, `apps/trips/`, `Ready for Feature 1...`) in final slice templates.
 - Do **not** add dark mode toggles, unrequested login screens, or standalone static pages.
 - Do **not** use emojis anywhere in the UI (use inline stroke SVGs).
