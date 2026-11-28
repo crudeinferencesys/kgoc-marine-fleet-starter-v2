@@ -55,6 +55,7 @@ def _build_copilot_context(
     strict_weather: bool = True,
     allow_milk_run: bool = False,
     invoke_ai: bool = False,
+    ai_review_requested: bool = False,
     active_tab: str = "review",
     active_subtab: str = "verdicts",
     notice: str = "",
@@ -91,6 +92,7 @@ def _build_copilot_context(
         "ai_configured": result["ai_configured"],
         "ai_fallback_used": result["ai_fallback_used"],
         "ai_live_used": result["ai_live_used"],
+        "ai_review_requested": ai_review_requested,
         "ai_status_note": result["ai_status_note"],
         "briefing": briefing,
         "briefing_json": json.dumps(briefing),
@@ -135,6 +137,7 @@ def index(request: HttpRequest) -> HttpResponse:
         strict_weather=strict_weather,
         allow_milk_run=allow_milk_run,
         invoke_ai=False,
+        ai_review_requested=False,
         active_tab=active_tab,
     )
     return render(request, "optimizer/copilot.html", context)
@@ -166,6 +169,7 @@ def review(request: HttpRequest) -> HttpResponse:
         else f"Deterministic risk review ready for '{scenario['title']}'."
     )
     context = _build_copilot_context(
+        ai_review_requested=True,
         active_tab="review",
         active_subtab="verdicts",
         notice=notice,
@@ -217,6 +221,7 @@ def save_briefing(request: HttpRequest) -> HttpResponse:
         current_review["ai_live_used"] = not ai_fallback_used
 
     context = _build_copilot_context(
+        ai_review_requested=not ai_fallback_used,
         active_tab="review",
         active_subtab="verdicts",
         notice=notice,
