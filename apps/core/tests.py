@@ -337,6 +337,33 @@ class CoreSmokeTests(TestCase):
         self.assertContains(response, "976")
         self.assertContains(response, "control-tower-vessel-chart")
 
+    def test_control_tower_renders_interactive_tactical_map_with_trajectories(self):
+        from apps.core.services import get_control_tower_metrics
+
+        empty_response = self.client.get(reverse("core:home"))
+        self.assertEqual(empty_response.status_code, 200)
+        self.assertContains(empty_response, 'id="kjo-tactical-map"')
+        self.assertContains(empty_response, "control-tower-tactical-map")
+        self.assertContains(empty_response, "Schematic Mock Sector")
+
+        call_command("seed_fleet", if_empty=True, stdout=io.StringIO())
+        tactical_map = get_control_tower_metrics()["tactical_map"]
+        self.assertEqual(len(tactical_map["destinations"]), 5)
+        self.assertEqual(len(tactical_map["routes"]), 12)
+        self.assertIn("Platform A", tactical_map["merge_corridors"])
+        cb07_routes = [r for r in tactical_map["routes"] if r["vessel_id"] == "CB-07"]
+        self.assertTrue(cb07_routes)
+        self.assertTrue(cb07_routes[0]["has_hse_lock"])
+        self.assertTrue(all("cx" in r and "bearing_deg" in r for r in tactical_map["routes"]))
+
+        seeded_response = self.client.get(reverse("core:home"))
+        self.assertEqual(seeded_response.status_code, 200)
+        self.assertContains(seeded_response, 'id="kjo-tactical-map"')
+        self.assertContains(seeded_response, 'data-scroll-label="Offshore Tactical Map"')
+        self.assertContains(seeded_response, "CB-01")
+        self.assertContains(seeded_response, "Platform A")
+        self.assertContains(seeded_response, "kjoTacticalMap")
+
     def test_copilot_4th_feature_route_and_navigation(self):
         home_response = self.client.get(reverse("core:home"))
         self.assertEqual(home_response.status_code, 200)
