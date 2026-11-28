@@ -43,6 +43,20 @@ class CoreSmokeTests(TestCase):
         self.assertNotContains(response, "lg:pl-64")
         self.assertNotContains(response, "lg:translate-x-0")
 
+    def test_home_renders_scroll_awareness_and_calm_validation_shell(self):
+        response = self.client.get(reverse("core:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="scroll-progress-bar"')
+        self.assertContains(response, "animation-timeline: scroll(root block)")
+        self.assertContains(
+            response,
+            "@supports ((animation-timeline: view()) and (animation-range: entry))",
+        )
+        self.assertContains(response, 'id="topbar-scroll-context"')
+        self.assertContains(response, 'id="back-to-top-btn"')
+        self.assertContains(response, ".field-control:user-invalid")
+        self.assertContains(response, "IntersectionObserver")
+
     @override_settings(GEMINI_MODEL="gemini-4-hydrogen")
     def test_health_and_healthz_report_ok_database_and_model(self):
         for url_name in ("core:health", "core:healthz"):
