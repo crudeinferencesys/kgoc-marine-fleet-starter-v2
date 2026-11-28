@@ -37,11 +37,22 @@ def is_ai_configured() -> bool:
     return bool(getattr(settings, "GEMINI_API_KEY", "").strip())
 
 
+def _strip_markdown_fences(text: str) -> str:
+    """Strip optional surrounding markdown code fences (e.g. ```json ... ```)."""
+    stripped = text.strip()
+    if not stripped.startswith("```"):
+        return stripped
+    lines = stripped.splitlines()
+    if len(lines) >= 2 and lines[0].startswith("```") and lines[-1].strip() == "```":
+        return "\n".join(lines[1:-1]).strip()
+    return stripped
+
+
 def _extract_output_text(interaction: object) -> str:
     """Extract generated text from an Interactions API response."""
     output_text = (getattr(interaction, "output_text", None) or "").strip()
     if output_text:
-        return output_text
+        return _strip_markdown_fences(output_text)
 
     chunks: list[str] = []
     for step in getattr(interaction, "steps", None) or ():
@@ -52,7 +63,7 @@ def _extract_output_text(interaction: object) -> str:
                 text = getattr(content, "text", None)
                 if text:
                     chunks.append(text)
-    return "".join(chunks).strip()
+    return _strip_markdown_fences("".join(chunks))
 
 
 def generate_structured(

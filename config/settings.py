@@ -99,6 +99,7 @@ if CLOUD_SQL_CONNECTION_NAME:
             "PASSWORD": os.environ.get("DB_PASSWORD", ""),
             "HOST": f"/cloudsql/{CLOUD_SQL_CONNECTION_NAME}",
             "CONN_MAX_AGE": 60,
+            "CONN_HEALTH_CHECKS": True,
         }
     }
 elif DATABASE_URL:
@@ -106,6 +107,7 @@ elif DATABASE_URL:
         "default": dj_database_url.parse(
             DATABASE_URL,
             conn_max_age=60,
+            conn_health_checks=True,
         )
     }
 else:

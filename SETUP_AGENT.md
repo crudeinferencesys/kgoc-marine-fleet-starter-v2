@@ -62,7 +62,7 @@ Run inside the project root using `.venv/bin/python` (or `.venv\Scripts\python.e
 3. `python manage.py makemigrations --check --dry-run`
 4. `python manage.py test`
 5. `python manage.py inspect_dataset --help`
-6. Start a brief local test (`manage.py runserver 127.0.0.1:8009` in background for 3 seconds, curl `http://127.0.0.1:8009/`, `http://127.0.0.1:8009/healthz`, and `http://127.0.0.1:8009/trips/`, then stop the server). Verify `/healthz` returns `{"status": "ok", "database": "sqlite3", "ai_configured": true}` (or note if `GEMINI_API_KEY` was intentionally left blank).
+6. Start a brief local test (`manage.py runserver 127.0.0.1:8009` in background for 3 seconds, curl `http://127.0.0.1:8009/`, `http://127.0.0.1:8009/health/`, and `http://127.0.0.1:8009/trips/`, then stop the server). Verify `/health/` returns `{"status": "ok", "database": "sqlite3", "ai_configured": true, "gemini_model": "gemini-4-hydrogen"}` (or note if `GEMINI_API_KEY` was intentionally left blank).
 
 > **Laptop B Checkpoint:** If this is **Laptop B**, **STOP HERE**, print the Final Status Summary Table, and confirm readiness for tomorrow's `feat/optimizer-*` or `feat/trips-*` branch workflow.
 
@@ -110,8 +110,8 @@ Once confirmed, run with the chosen `PROJECT_ID`, `BILLING_ACCOUNT_ID`, and `REG
      --add-cloudsql-instances "$CLOUD_SQL_CONNECTION_NAME" \
      --set-env-vars "DEBUG=False,DJANGO_SECRET_KEY=$DJANGO_SECRET_KEY,CLOUD_SQL_CONNECTION_NAME=$CLOUD_SQL_CONNECTION_NAME,DB_NAME=kgoc_fleet,DB_USER=kgoc_app,DB_PASSWORD=$DB_PASS,GEMINI_API_KEY=$GEMINI_API_KEY,GEMINI_MODEL=gemini-4-hydrogen"
    ```
-2. Capture the deployed Cloud Run URL (`SERVICE_URL`) and verify live endpoints via `curl`:
-   - `curl -sf "$SERVICE_URL/healthz"` -> MUST show `"status": "ok"`, `"database": "postgresql"`, and `"ai_configured": true`.
+2. Capture the deployed Cloud Run URL (`SERVICE_URL`) and verify live endpoints via `curl` (note Cloud Run reserves `/healthz`, so use `/health/`):
+   - `curl -sf "$SERVICE_URL/health/"` -> MUST show `"status": "ok"`, `"database": "postgresql"`, and `"ai_configured": true`.
    - `curl -sf -o /dev/null -w "%{http_code}" "$SERVICE_URL/"` -> `200`.
    - `curl -sf -o /dev/null -w "%{http_code}" "$SERVICE_URL/trips/"` -> `200`.
    - `curl -sf -o /dev/null -w "%{http_code}" "$SERVICE_URL/optimizer/"` -> `200`.
@@ -142,7 +142,7 @@ Guide the user through the 1-minute Cloud Console click path:
 
 ### 3. `[PAUSE FOR HUMAN + AUTO VERIFY]` Human Merges PR #1 -> Verify Cloud Build
 1. Give the user the PR #1 link and ask them to click **Merge pull request** on GitHub.
-2. Once the user confirms merged, check `gcloud builds list --limit=3` (Wait until the triggered build finishes `SUCCESS`) and re-verify `curl -sf "$SERVICE_URL/healthz"`.
+2. Once the user confirms merged, check `gcloud builds list --limit=3` (Wait until the triggered build finishes `SUCCESS`) and re-verify `curl -sf "$SERVICE_URL/health/"`.
 
 ---
 
@@ -152,4 +152,4 @@ Print a table with `PASS` / `FAIL` / `MANUAL` for:
 - Antigravity Harness + Required Plugins (`egm` + `invoke_subagent`, `github-mcp-server`, `google-cloud-developer`, `gemini-api`, `context7`)
 - `gh` CLI + Correct Team Repo `origin`
 - Local `.venv`, `.env` (`GEMINI_API_KEY`), `manage.py check`, `makemigrations --check`, `manage.py test`
-- *(Laptop A only)* Cloud SQL Postgres (`kgoc-pg`), Cloud Run (`$SERVICE_URL/healthz` -> `postgresql`), and GitHub Continuous Deployment (`^main$`)
+- *(Laptop A only)* Cloud SQL Postgres (`kgoc-pg`), Cloud Run (`$SERVICE_URL/health/` -> `postgresql`), and GitHub Continuous Deployment (`^main$`)
