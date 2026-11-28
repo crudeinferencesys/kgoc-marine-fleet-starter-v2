@@ -536,3 +536,72 @@ class SafetyViewIntegrationTests(TestCase):
         self.assertContains(index_resp, 'id="optional-hold-details"')
         self.assertContains(index_resp, ":class=\"{ 'hidden': step !== 3 }\"")
         self.assertContains(index_resp, 'style="display: none;"')
+
+
+class SafetyOptimizerCrossSliceTests(TestCase):
+    """Verify SafetyOverride rules created/toggled in /safety/ constrain /optimizer/ live."""
+
+    def setUp(self):
+        call_command("seed_fleet")
+        self.cb07 = Vessel.objects.get(vessel_id="CB-07")
+        self.cb08 = Vessel.objects.get(vessel_id="CB-08")
+        self.cb07_lock = SafetyOverride.objects.get(
+            rule_type="standby_lock", vessel=self.cb07
+        )
+
+    def test_safety_holds_and_toggles_constrain_optimizer_solver(self):
+        from apps.optimizer.services import run_shift_optimizer
+
+        # Baseline: CB-07 locked by seeded standby_lock; CB-08 eligible; Platform A merges
+        baseline = run_shift_optimizer(strict_weather=True, allow_milk_run=False)
+        baseline_eligible_ids = {v.vessel_id for v in baseline["eligible_vessels"]}
+        self.assertNotIn("CB-07", baseline_eligible_ids)
+        self.assertIn("CB-08", baseline_eligible_ids)
+        self.assertIn(
+            "TR-QUEUE-01+TR-QUEUE-02",
+            {m["merge_id"] for m in baseline["proposed_merges"]},
+        )
+
+        # 1. 1-click Maintenance Hold on TR-00012 (CB-08) blocks CB-08 in optimizer
+        self.client.post(
+            reverse("safety:quick_hold", kwargs={"trip_id": "TR-00012"})
+        )
+        after_maint = run_shift_optimizer(strict_weather=True, allow_milk_run=False)
+        self.assertNotIn(
+            "CB-08", {v.vessel_id for v in after_maint["eligible_vessels"]}
+        )
+        held_by_trip = {h["trip"].trip_id: h["category"] for h in after_maint["held_trips"]}
+        self.assertEqual(held_by_trip["TR-QUEUE-10"], "maintenance_hold")
+        self.assertEqual(held_by_trip["TR-QUEUE-12"], "maintenance_hold")
+
+        # 2. Weather Hold on Platform A via /safety/holds/create/ blocks Platform A merge
+        self.client.post(
+            reverse("safety:create_hold"),
+            data={
+                "rule_type": "weather_hold",
+                "severity": "high",
+                "destination": "Platform A",
+            },
+        )
+        after_weather = run_shift_optimizer(strict_weather=False, allow_milk_run=False)
+        self.assertNotIn(
+            "TR-QUEUE-01+TR-QUEUE-02",
+            {m["merge_id"] for m in after_weather["proposed_merges"]},
+        )
+        weather_held = {h["trip"].trip_id: h["category"] for h in after_weather["held_trips"]}
+        self.assertEqual(weather_held["TR-QUEUE-01"], "weather_hold")
+        self.assertEqual(weather_held["TR-QUEUE-02"], "weather_hold")
+
+        # 3. Clearing CB-07 standby_lock restores CB-07 eligibility; reactivating re-locks it
+        toggle_url = reverse("safety:toggle_hold", kwargs={"pk": self.cb07_lock.pk})
+        self.client.post(toggle_url)
+        after_clear = run_shift_optimizer(strict_weather=True, allow_milk_run=False)
+        self.assertIn("CB-07", {v.vessel_id for v in after_clear["eligible_vessels"]})
+
+        self.client.post(toggle_url)
+        after_relock = run_shift_optimizer(strict_weather=True, allow_milk_run=False)
+        self.assertNotIn(
+            "CB-07", {v.vessel_id for v in after_relock["eligible_vessels"]}
+        )
+        relock_held = {h["trip"].trip_id: h["category"] for h in after_relock["held_trips"]}
+        self.assertEqual(relock_held["TR-QUEUE-09"], "standby_lock")
