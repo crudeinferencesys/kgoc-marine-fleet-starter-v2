@@ -322,3 +322,17 @@ class CoreSmokeTests(TestCase):
         self.assertContains(response, "Control Tower")
         self.assertContains(response, "976")
         self.assertContains(response, "control-tower-vessel-chart")
+
+    def test_copilot_4th_feature_route_and_navigation(self):
+        home_response = self.client.get(reverse("core:home"))
+        self.assertEqual(home_response.status_code, 200)
+        self.assertContains(home_response, reverse("core:copilot:index"))
+        self.assertContains(home_response, "04 · AI")
+
+        copilot_response = self.client.get(reverse("core:copilot:index"))
+        self.assertEqual(copilot_response.status_code, 200)
+        self.assertContains(copilot_response, "AI Dispatch Co-Pilot")
+
+        ping_response = self.client.post(reverse("core:copilot:ping"))
+        self.assertEqual(ping_response.status_code, 200)
+        self.assertContains(ping_response, "HTMX POST + CSRF verified")

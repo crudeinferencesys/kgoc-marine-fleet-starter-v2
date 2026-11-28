@@ -15,5 +15,6 @@ Index of active specifications, frozen boundaries, and team ownership.
 |---|---|---|
 | Core Shell & Frozen Schema | `apps/core/`, `templates/base.html`, `config/` | Shared (Salman freezes schema PR at 11:15–11:40 AM) |
 | Control Tower + Feature 1: Trips & Utilization | `apps/trips/`, `templates/trips/`, `templates/core/home.html` | **Salman** (Laptop A) |
-| Feature 2: Dispatch Optimizer + Actionable AI | `apps/optimizer/`, `templates/optimizer/` | **Saleh** (Laptop B) |
+| Feature 2: Dispatch Optimizer | `apps/optimizer/views.py`, `urls.py`, `templates/optimizer/index.html` | **Saleh** (Laptop B) |
 | Feature 3: Safety & Fuel Anomaly Guard | `apps/safety/`, `templates/safety/` | **First Finisher** (Coordinate) |
+| Feature 4 (Bonus AI): AI Dispatch Co-Pilot (`/copilot/`) | `apps/optimizer/copilot_urls.py`, `copilot_views.py`, `templates/optimizer/copilot.html` | **Saleh** (Laptop B, after Feature 2) |

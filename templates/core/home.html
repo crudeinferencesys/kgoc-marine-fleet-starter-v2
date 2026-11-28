@@ -225,30 +225,24 @@
         </div>
       </a>
 
-      <!-- Launch Card 02: Dispatch Optimizer & Gemini 4 Co-Pilot -->
+      <!-- Launch Card 02: Dispatch Consolidation Optimizer -->
       <a href="{% url 'optimizer:index' %}" class="block surface-card surface-card-hover p-5 group">
         <div class="flex items-start justify-between gap-3">
           <div class="flex items-center gap-2.5">
-            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700 font-mono text-xs font-bold border border-indigo-200/80">02</span>
+            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 text-teal-700 font-mono text-xs font-bold border border-teal-200/80">02</span>
             <div>
               <h3 class="text-base font-semibold text-slate-900 group-hover:text-teal-700 transition-colors">
-                Dispatch Optimizer &amp; Gemini 4 Co-Pilot
+                Dispatch Consolidation Optimizer
               </h3>
-              <p class="text-xs text-slate-500">Merge overlapping runs into shared sailings with AI risk review</p>
+              <p class="text-xs text-slate-500">Merge overlapping pending runs under capacity, window, and HSE limits</p>
             </div>
           </div>
-          {% if ai_configured %}
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-600 text-white shrink-0">
-            AI Configured
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono tabular-nums shrink-0">
+            {{ metrics.backtest_trips_eliminated }} merges
           </span>
-          {% else %}
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-800 border border-indigo-200 shrink-0">
-            AI Fallback
-          </span>
-          {% endif %}
         </div>
         <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-          <span class="text-slate-500 font-mono tabular-nums">{{ metrics.approved_plans_count }} approved plans · {{ metrics.backtest_trips_eliminated }} backtest merges</span>
+          <span class="text-slate-500 font-mono tabular-nums">{{ metrics.approved_plans_count }} approved plans · {{ metrics.backtest_kwd_saved|floatformat:"0g" }} KWD 90d est.</span>
           <span class="font-semibold text-teal-700 inline-flex items-center gap-1">
             Open Optimizer
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -278,6 +272,39 @@
           <span class="text-slate-500 font-mono tabular-nums">{{ metrics.low_fuel_anomalies_count }} low burn · {{ metrics.missing_fuel_logs_count }} missing logs</span>
           <span class="font-semibold text-teal-700 inline-flex items-center gap-1">
             Open Guard
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+            </svg>
+          </span>
+        </div>
+      </a>
+
+      <!-- Launch Card 04: Standalone Bonus AI Dispatch Co-Pilot -->
+      <a href="{% url 'core:copilot:index' %}" class="block ai-copilot-surface surface-card-hover p-5 group">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex items-center gap-2.5">
+            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-mono text-xs font-bold">04</span>
+            <div>
+              <h3 class="text-base font-semibold text-indigo-950 group-hover:text-indigo-700 transition-colors">
+                AI Dispatch Co-Pilot
+              </h3>
+              <p class="text-xs text-slate-600">Standalone Gemini 4 shift risk review, HSE recommendations, and handover briefings</p>
+            </div>
+          </div>
+          {% if ai_configured %}
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-600 text-white shrink-0">
+            Bonus AI · Configured
+          </span>
+          {% else %}
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-900 border border-amber-200 shrink-0">
+            Fallback Ready
+          </span>
+          {% endif %}
+        </div>
+        <div class="mt-3 pt-3 border-t border-indigo-200/60 flex items-center justify-between text-xs">
+          <span class="text-indigo-900/75 font-mono tabular-nums">{{ gemini_model }} · {{ metrics.pending_trips }} live queue</span>
+          <span class="font-semibold text-indigo-700 inline-flex items-center gap-1">
+            Open Co-Pilot
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
             </svg>

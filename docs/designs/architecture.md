@@ -15,5 +15,5 @@
 - **In-App Bonus AI:** `google-genai >= 3.5.0` Interactions API (`apps/core/ai.py`) calling `gemini-4-hydrogen` with Pydantic structured JSON outputs (`DispatchBriefing`), `GEMINI_API_KEY` from Google AI Studio, and deterministic fallbacks on timeout or missing key.
 
 ## 3. Security & Judging Access
-- **Public Judging Access:** No login/authentication wall on app routes (`/`, `/trips/`, `/optimizer/`, `/safety/`, `/health/` — note Cloud Run reserves `/healthz`).
+- **Public Judging Access:** No login/authentication wall on app routes (`/`, `/trips/`, `/optimizer/`, `/safety/`, `/copilot/`, `/health/` — note Cloud Run reserves `/healthz`).
 - **Proxy & CSRF:** `SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")` and `CSRF_TRUSTED_ORIGINS` includes `https://*.run.app` so HTMX POST requests work cleanly behind Cloud Run TLS termination.

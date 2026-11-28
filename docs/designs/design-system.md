@@ -1,7 +1,7 @@
 # Hybrid Maritime Command Design System
 
 > **Mandatory UI Contract for Both Teams & AI Agents:**
-> Follow this specification across `/`, `/trips/`, `/optimizer/`, and `/safety/` on our zero-build CDN stack (**Tailwind CSS Play CDN + DaisyUI 4.12 + HTMX 2 + Alpine.js 3 + Chart.js 4**). All fonts, color tokens, sidebar shell, and surface helpers are preloaded in `templates/base.html`.
+> Follow this specification across `/`, `/trips/`, `/optimizer/`, `/safety/`, and `/copilot/` on our zero-build CDN stack (**Tailwind CSS Play CDN + DaisyUI 4.12 + HTMX 2 + Alpine.js 3 + Chart.js 4**). All fonts, color tokens, sidebar shell, and surface helpers are preloaded in `templates/base.html`.
 
 ---
 
