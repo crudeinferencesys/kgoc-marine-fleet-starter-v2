@@ -33,6 +33,16 @@ class CoreSmokeTests(TestCase):
         self.assertContains(response, "#0A1628")
         self.assertContains(response, "--p: 56% 0.11 180")
 
+    def test_home_renders_popout_burger_sidebar_drawer(self):
+        response = self.client.get(reverse("core:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="command-sidebar"')
+        self.assertContains(response, 'aria-controls="command-sidebar"')
+        self.assertContains(response, "sidebarOpen = !sidebarOpen")
+        self.assertContains(response, '@keydown.escape.window="sidebarOpen = false"')
+        self.assertNotContains(response, "lg:pl-64")
+        self.assertNotContains(response, "lg:translate-x-0")
+
     @override_settings(GEMINI_MODEL="gemini-4-hydrogen")
     def test_health_and_healthz_report_ok_database_and_model(self):
         for url_name in ("core:health", "core:healthz"):
