@@ -9,7 +9,7 @@ never crash judging.
 from __future__ import annotations
 
 import logging
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 from django.conf import settings
 from google import genai
@@ -29,6 +29,25 @@ class DispatchBriefing(BaseModel):
     executive_summary: str
     recommended_actions: list[str]
     safety_flags: list[str]
+    estimated_impact_note: str
+
+
+class MergeRiskAssessment(BaseModel):
+    """Per-merge risk verdict returned by Gemini 4 Co-Pilot for UI gating."""
+
+    group_id: str
+    verdict: Literal["approve", "review", "hold"]
+    risk_level: Literal["low", "medium", "high"]
+    rationale: str
+
+
+class ActionableDispatchBriefing(BaseModel):
+    """Actionable structured-output contract driving UI merge approvals & handover."""
+
+    executive_summary: str
+    merge_assessments: list[MergeRiskAssessment]
+    safety_flags: list[str]
+    shift_handover_note: str
     estimated_impact_note: str
 
 
