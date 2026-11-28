@@ -13,6 +13,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from apps.core.constants import (
+    ASSUMED_DIESEL_KWD_PER_LITER,
     DESTINATIONS,
     MISSION_TYPES,
     PRIORITIES,
@@ -203,6 +204,29 @@ def trip_inspector(request: HttpRequest, trip_id: str) -> HttpResponse:
         .exclude(status="cancelled")
         .order_by("departure_dt")[:4]
     )
+    idle_kwd = round(trip.idle_fuel_l * ASSUMED_DIESEL_KWD_PER_LITER, 1)
+    fuel_excess_kwd = (
+        round(abs(trip.fuel_excess_l) * ASSUMED_DIESEL_KWD_PER_LITER, 1)
+        if trip.fuel_excess_l is not None
+        else None
+    )
+    expected_fuel_kwd = round(trip.expected_fuel_l * ASSUMED_DIESEL_KWD_PER_LITER, 1)
+    total_hours = round(
+        trip.underway_hours + trip.onsite_work_hours + trip.nonproductive_idle_hours,
+        2,
+    )
+    util_pct = trip.utilization_pct
+    if util_pct > 100:
+        load_status_label = "Overloaded"
+    elif util_pct > 95:
+        load_status_label = "Near Cap"
+    elif util_pct >= 70:
+        load_status_label = "Optimal"
+    elif util_pct >= 50:
+        load_status_label = "Moderate"
+    else:
+        load_status_label = "Half-Empty"
+
     return render(
         request,
         "trips/partials/trip_inspector.html",
@@ -210,6 +234,11 @@ def trip_inspector(request: HttpRequest, trip_id: str) -> HttpResponse:
             "trip": trip,
             "active_overrides": active_overrides,
             "sibling_trips": sibling_trips,
+            "idle_kwd": idle_kwd,
+            "fuel_excess_kwd": fuel_excess_kwd,
+            "expected_fuel_kwd": expected_fuel_kwd,
+            "total_hours": total_hours,
+            "load_status_label": load_status_label,
         },
     )
 

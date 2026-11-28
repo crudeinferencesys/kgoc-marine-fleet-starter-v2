@@ -288,7 +288,7 @@ class TripsViewIntegrationTests(TestCase):
         self.assertTrue(all(t.weather == "Rough" for t in rough_result["page_obj"]))
 
     def test_trip_inspector_returns_telemetry_siblings_and_404(self):
-        # CB-07 pending trip should show standby lock HSE override and physics telemetry
+        # CB-07 pending trip should show standby lock HSE override, physics telemetry, and KWD idle cost
         cb07_trip = Trip.objects.filter(vessel__vessel_id="CB-07", status="pending").first()
         self.assertIsNotNone(cb07_trip)
 
@@ -300,6 +300,57 @@ class TripsViewIntegrationTests(TestCase):
         self.assertContains(response, "Physics-Based Fuel Audit")
         self.assertContains(response, "Standby Vessel Protection Lock")
         self.assertContains(response, "Same-Day Corridor Siblings")
+        self.assertContains(response, "KWD")
+        self.assertContains(response, "trip-inspector:close")
+
+        # High fuel outlier trip should surface spike summary, excess KWD, and Safety & Fuel Guard CTA
+        outlier_trip = next(
+            (
+                t
+                for t in Trip.objects.select_related("vessel").filter(actual_fuel_l__isnull=False)
+                if t.fuel_anomaly_status == "high"
+            ),
+            None,
+        )
+        self.assertIsNotNone(outlier_trip)
+        outlier_res = self.client.get(
+            reverse("trips:inspect", kwargs={"trip_id": outlier_trip.trip_id})
+        )
+        self.assertEqual(outlier_res.status_code, 200)
+        self.assertContains(outlier_res, "Fuel spike:")
+        self.assertContains(outlier_res, "KWD")
+        self.assertContains(outlier_res, "Safety &amp; Fuel Guard")
+
+        # Consolidated trip should render Dispatch Consolidation banner with carrier link + Optimizer link
+        plan = DispatchPlan.objects.create(
+            name="Inspector Modal Merge Plan",
+            scope="pending",
+            baseline_trips=2,
+            optimized_trips=1,
+            trips_eliminated=1,
+            fuel_liters_saved=180.0,
+            kwd_saved=96.0,
+            co2_kg_saved=482.4,
+            is_approved=True,
+        )
+        carrier = Trip.objects.get(trip_id="TR-QUEUE-01")
+        absorbed = Trip.objects.get(trip_id="TR-QUEUE-02")
+        absorbed.status = "consolidated"
+        absorbed.dispatch_plan = plan
+        absorbed.consolidated_into = carrier
+        absorbed.save(update_fields=["status", "dispatch_plan", "consolidated_into"])
+
+        consolidated_res = self.client.get(
+            reverse("trips:inspect", kwargs={"trip_id": absorbed.trip_id})
+        )
+        self.assertEqual(consolidated_res.status_code, 200)
+        self.assertContains(consolidated_res, "Dispatch Consolidation")
+        self.assertContains(consolidated_res, "Inspector Modal Merge Plan")
+        self.assertContains(
+            consolidated_res,
+            reverse("trips:inspect", kwargs={"trip_id": carrier.trip_id}),
+        )
+        self.assertContains(consolidated_res, reverse("optimizer:index"))
 
         missing_response = self.client.get(
             reverse("trips:inspect", kwargs={"trip_id": "TR-DOES-NOT-EXIST"})
@@ -310,6 +361,7 @@ class TripsViewIntegrationTests(TestCase):
         response = self.client.get(reverse("trips:index"))
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'id="booking-drawer"')
+        self.assertNotContains(response, 'id="trip-inspector-drawer"')
         self.assertContains(response, 'id="trip-booking-workflow"')
         self.assertContains(response, "Log New Trip")
         self.assertContains(response, "Route &amp; Mission")
@@ -321,7 +373,7 @@ class TripsViewIntegrationTests(TestCase):
         self.assertContains(response, "Fuel Outliers")
         self.assertContains(response, "Missing Logs")
         self.assertContains(response, "Rough Weather")
-        self.assertContains(response, 'id="trip-inspector-drawer"')
+        self.assertContains(response, 'id="trip-inspector-modal"')
         self.assertContains(response, "More Filters")
         self.assertContains(response, 'id="trips-more-filters-modal"')
         self.assertContains(response, "Route &amp; Area")
