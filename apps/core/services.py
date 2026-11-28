@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from django.db.models import Count, Sum
+
 from apps.core.constants import (
     CONSOLIDATION_DETOUR_FUEL_PENALTY_FACTOR,
     DESTINATIONS,
@@ -157,7 +159,16 @@ def get_control_tower_metrics() -> dict:
     )
     active_hse_overrides_count = len(active_overrides_all)
     active_hse_overrides = active_overrides_all[:3]
-    approved_plans_count = DispatchPlan.objects.filter(is_approved=True).count()
+    approved_agg = DispatchPlan.objects.filter(is_approved=True).aggregate(
+        count=Count("id"),
+        trips_eliminated=Sum("trips_eliminated"),
+        fuel_saved_l=Sum("fuel_liters_saved"),
+        kwd_saved=Sum("kwd_saved"),
+    )
+    approved_plans_count = int(approved_agg["count"] or 0)
+    approved_plans_trips_eliminated = int(approved_agg["trips_eliminated"] or 0)
+    approved_plans_fuel_saved_l = round(float(approved_agg["fuel_saved_l"] or 0.0), 1)
+    approved_plans_kwd_saved = round(float(approved_agg["kwd_saved"] or 0.0), 2)
 
     chart_labels: list[str] = []
     chart_avg_util: list[float] = []
@@ -203,6 +214,9 @@ def get_control_tower_metrics() -> dict:
         "missing_fuel_logs_count": missing_fuel_logs_count,
         "normal_fuel_count": normal_fuel_count,
         "approved_plans_count": approved_plans_count,
+        "approved_plans_trips_eliminated": approved_plans_trips_eliminated,
+        "approved_plans_fuel_saved_l": approved_plans_fuel_saved_l,
+        "approved_plans_kwd_saved": approved_plans_kwd_saved,
         "vessel_chart_data": {
             "labels": chart_labels,
             "avg_util": chart_avg_util,
