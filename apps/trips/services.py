@@ -174,7 +174,7 @@ def get_vessels_meta() -> dict[str, dict[str, Any]]:
     }
 
 
-def filter_trips(params: Mapping[str, Any]) -> dict[str, Any]:
+def filter_trips(params: Mapping[str, Any], *, default_per_page: int = 25) -> dict[str, Any]:
     """Filter and paginate trips with pending shift rows prioritized ahead of historical sailings."""
     raw_status = str(params.get("status") or "all").strip().lower()
     valid_statuses = {"all", "pending", "completed", "consolidated", "cancelled"}
@@ -189,6 +189,12 @@ def filter_trips(params: Mapping[str, Any]) -> dict[str, Any]:
     weather = raw_weather if raw_weather in {"Calm", "Moderate", "Rough"} else ""
     q = str(params.get("q") or "").strip()
     page_num = params.get("page") or 1
+
+    raw_per_page = str(params.get("per_page") or "").strip()
+    if raw_per_page.isdigit() and int(raw_per_page) in {8, 15, 25}:
+        per_page = int(raw_per_page)
+    else:
+        per_page = default_per_page
 
     all_non_cancelled = list(
         Trip.objects.select_related("vessel").exclude(status="cancelled")
@@ -233,22 +239,29 @@ def filter_trips(params: Mapping[str, Any]) -> dict[str, Any]:
     if anomaly:
         trips = [trip for trip in trips if trip.fuel_anomaly_status == anomaly]
 
-    # Pending queue rows always appear before historical rows; within pending, newest created first.
+    # Pending queue rows always appear before historical rows: live bookings first, then chronological shift departures.
     trips.sort(
         key=lambda t: (
             0 if t.status == "pending" else 1,
-            -t.created_at.timestamp() if t.status == "pending" else 0.0,
-            -t.departure_dt.timestamp(),
+            0 if (t.status == "pending" and t.trip_id.startswith("TR-LIVE-")) else 1,
+            (
+                -t.created_at.timestamp()
+                if (t.status == "pending" and t.trip_id.startswith("TR-LIVE-"))
+                else 0.0
+            ),
+            t.departure_dt.timestamp() if t.status == "pending" else -t.departure_dt.timestamp(),
             -(t.pk or 0),
         )
     )
 
-    paginator = Paginator(trips, 25)
+    paginator = Paginator(trips, per_page)
     page_obj = paginator.get_page(page_num)
 
     return {
         "page_obj": page_obj,
+        "filtered_trips": trips,
         "total_filtered_count": len(trips),
+        "per_page": per_page,
         "status_counts": status_counts,
         "preset_counts": preset_counts,
         "filters": {
@@ -259,6 +272,7 @@ def filter_trips(params: Mapping[str, Any]) -> dict[str, Any]:
             "anomaly": anomaly,
             "weather": weather,
             "q": q,
+            "per_page": per_page,
         },
     }
 

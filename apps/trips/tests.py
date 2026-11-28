@@ -316,3 +316,28 @@ class TripsViewIntegrationTests(TestCase):
         self.assertContains(response, "Missing Logs")
         self.assertContains(response, "Rough Weather")
         self.assertContains(response, 'id="trip-inspector-drawer"')
+        self.assertContains(response, 'id="booking-drawer"')
+        self.assertContains(response, "Advanced Filters")
+        self.assertContains(response, "Export CSV")
+        self.assertContains(response, "Trip Ledger")
+        self.assertContains(response, "Fleet Analytics")
+
+    def test_zero_scroll_pagination_and_filtered_csv_export(self):
+        default_page = self.client.get(reverse("trips:index"))
+        self.assertEqual(default_page.status_code, 200)
+        self.assertEqual(len(default_page.context["page_obj"]), 8)
+
+        page_15 = self.client.get(reverse("trips:ledger"), data={"per_page": "15"})
+        self.assertEqual(page_15.status_code, 200)
+        self.assertEqual(len(page_15.context["page_obj"]), 15)
+
+        csv_response = self.client.get(
+            reverse("trips:export_csv"),
+            data={"status": "pending", "destination": "Platform A"},
+        )
+        self.assertEqual(csv_response.status_code, 200)
+        self.assertIn("text/csv", csv_response["Content-Type"])
+        self.assertIn("kgoc_fleet_trips.csv", csv_response["Content-Disposition"])
+        body = csv_response.content.decode("utf-8")
+        self.assertIn("TR-QUEUE-01", body)
+        self.assertNotIn("TR-QUEUE-05", body)
