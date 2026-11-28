@@ -1,0 +1,645 @@
+<div id="optimizer-workspace"
+     class="htmx-fade-in"
+     x-data="{
+       activeTab: '{{ active_tab|default:"solver"|escapejs }}',
+       selectedIds: [{% for m in proposed_merges %}{% if m.checked_default %}'{{ m.merge_id|escapejs }}'{% if not forloop.last %},{% endif %}{% endif %}{% endfor %}],
+       mergeMetrics: {
+         {% for m in proposed_merges %}
+         '{{ m.merge_id|escapejs }}': {
+           fuel: {{ m.fuel_saved_l|stringformat:".1f" }},
+           kwd: {{ m.kwd_saved|stringformat:".2f" }},
+           co2: {{ m.co2_kg_saved|stringformat:".1f" }},
+           mins: {{ m.dispatcher_minutes_saved }}
+         }{% if not forloop.last %},{% endif %}
+         {% endfor %}
+       },
+       get selectedCount() {
+         return this.selectedIds.length;
+       },
+       get selectedFuel() {
+         return this.selectedIds.reduce((sum, id) => sum + (this.mergeMetrics[id]?.fuel || 0), 0);
+       },
+       get selectedKwd() {
+         return this.selectedIds.reduce((sum, id) => sum + (this.mergeMetrics[id]?.kwd || 0), 0);
+       },
+       get selectedCo2() {
+         return this.selectedIds.reduce((sum, id) => sum + (this.mergeMetrics[id]?.co2 || 0), 0);
+       },
+       get selectedMins() {
+         return this.selectedIds.reduce((sum, id) => sum + (this.mergeMetrics[id]?.mins || 0), 0);
+       },
+       fmtInt(n) {
+         return Math.round(n).toLocaleString('en-US');
+       },
+       fmtDec(n) {
+         return Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+       }
+     }">
+
+  <!-- Band 1: Slim Operational Toolbar -->
+  <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 mb-2.5">
+    <div class="flex flex-wrap items-center gap-2">
+      <h1 class="text-xl font-bold tracking-tight text-slate-900">Dispatch Optimizer</h1>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono tabular-nums bg-slate-100 text-slate-700 border border-slate-200">
+        {{ pending_count }} pending
+      </span>
+    </div>
+
+    <!-- 2-Tab Switcher -->
+    <div class="inline-flex items-center rounded-lg bg-slate-200/70 p-1 self-start lg:self-auto" role="tablist" aria-label="Optimizer workspace views">
+      <button type="button"
+              role="tab"
+              :aria-selected="(activeTab === 'solver').toString()"
+              @click="activeTab = 'solver'"
+              :class="activeTab === 'solver' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+              class="px-3 py-1 rounded-md text-xs font-semibold transition-all whitespace-nowrap">
+        Shift Queue Solver
+      </button>
+      <button type="button"
+              role="tab"
+              :aria-selected="(activeTab === 'plans').toString()"
+              @click="activeTab = 'plans'"
+              :class="activeTab === 'plans' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+              class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all whitespace-nowrap">
+        <span>Saved Plans &amp; Backtest</span>
+        <span class="font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200/80 text-slate-700 leading-none">{{ saved_plans_count }}</span>
+      </button>
+    </div>
+
+    <!-- Solver Policy Toggles + Run Solver CTA -->
+    <form method="post" action="{% url 'optimizer:solve' %}" class="flex flex-wrap items-center gap-1.5 shrink-0">
+      {% csrf_token %}
+      <input type="hidden" name="strict_weather" value="0" />
+      <label for="opt-strict-weather"
+             class="inline-flex items-center gap-1.5 cursor-pointer select-none px-2 py-1 rounded-lg bg-white border border-slate-200 text-xs font-medium text-slate-700 hover:border-slate-300">
+        <input id="opt-strict-weather"
+               type="checkbox"
+               name="strict_weather"
+               value="1"
+               {% if strict_weather %}checked{% endif %}
+               class="toggle toggle-xs toggle-primary" />
+        <span>HSE Strict Weather</span>
+      </label>
+
+      <input type="hidden" name="allow_milk_run" value="0" />
+      <label for="opt-allow-milk-run"
+             class="inline-flex items-center gap-1.5 cursor-pointer select-none px-2 py-1 rounded-lg bg-white border border-slate-200 text-xs font-medium text-slate-700 hover:border-slate-300">
+        <input id="opt-allow-milk-run"
+               type="checkbox"
+               name="allow_milk_run"
+               value="1"
+               {% if allow_milk_run %}checked{% endif %}
+               class="toggle toggle-xs toggle-primary" />
+        <span>Milk-Run</span>
+      </label>
+
+      <button type="submit"
+              hx-post="{% url 'optimizer:solve' %}"
+              hx-target="#optimizer-workspace"
+              hx-swap="outerHTML"
+              hx-indicator="#solve-spinner"
+              hx-disabled-elt="this"
+              class="btn btn-primary btn-xs gap-1.5 font-semibold">
+        <span class="htmx-hide-on-request inline-flex items-center gap-1.5">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="6 3 20 12 6 21 6 3" />
+          </svg>
+          <span>Run Solver</span>
+        </span>
+        <span id="solve-spinner" class="htmx-indicator items-center gap-1.5">
+          <span class="loading loading-spinner loading-xs"></span>
+          <span>Solving…</span>
+        </span>
+      </button>
+    </form>
+  </div>
+
+  {% if notice %}
+  <div class="mb-2 px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center justify-between gap-2 {% if notice_tone == 'emerald' %}bg-emerald-50 border-emerald-200 text-emerald-900{% else %}bg-amber-50 border-amber-200 text-amber-900{% endif %}"
+       role="status"
+       aria-live="polite">
+    <div class="flex items-center gap-2 min-w-0">
+      {% if notice_tone == 'emerald' %}
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-emerald-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M20 6 9 17l-5-5" />
+      </svg>
+      {% else %}
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-amber-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+        <path d="M12 9v4" /><path d="M12 17h.01" />
+      </svg>
+      {% endif %}
+      <span class="truncate">{{ notice }}</span>
+    </div>
+    <button type="button"
+            @click="activeTab = activeTab === 'solver' ? 'plans' : 'solver'"
+            class="text-[11px] font-semibold underline shrink-0">
+      <span x-text="activeTab === 'solver' ? 'View Saved Plans' : 'Back to Solver'">View Saved Plans</span>
+    </button>
+  </div>
+  {% endif %}
+
+  <!-- Band 2: Compact 4-KPI Impact Ribbon -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-2.5" data-scroll-section data-scroll-label="Impact KPIs">
+    <!-- KPI 1: Trips Eliminated -->
+    <div class="surface-card kpi-accent-teal p-3">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Trips Eliminated</span>
+        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-teal-50 text-teal-700 shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M16 3h5v5" /><path d="M8 3H3v5" /><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" /><path d="m15 9 6-6" />
+          </svg>
+        </span>
+      </div>
+      <div class="mt-1 flex items-baseline gap-1.5">
+        <span class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-slate-900"
+              x-text="activeTab === 'solver' ? selectedCount : {{ summary.trips_eliminated }}">{{ summary.trips_eliminated }}</span>
+        <span class="text-xs font-semibold text-slate-500">trips</span>
+        <span class="ml-auto text-[11px] text-slate-500 font-mono tabular-nums"
+              x-text="activeTab === 'solver' ? ({{ summary.baseline_trips }} + ' -> ' + ({{ summary.baseline_trips }} - selectedCount) + ' runs') : '{{ summary.baseline_trips }} -> {{ summary.optimized_trips }} runs'">{{ summary.baseline_trips }} -> {{ summary.optimized_trips }} runs</span>
+      </div>
+    </div>
+
+    <!-- KPI 2: Diesel Saved -->
+    <div class="surface-card kpi-accent-emerald p-3">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Diesel Saved</span>
+        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-50 text-emerald-700 shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+          </svg>
+        </span>
+      </div>
+      <div class="mt-1 flex items-baseline gap-1.5">
+        <span class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-emerald-700"
+              x-text="activeTab === 'solver' ? fmtDec(selectedFuel) : '{{ summary.fuel_liters_saved|floatformat:1 }}'">{{ summary.fuel_liters_saved|floatformat:1 }}</span>
+        <span class="text-xs font-semibold text-slate-500">L</span>
+        <span class="ml-auto text-[11px] text-slate-500 font-mono tabular-nums">{{ eligible_vessels|length }} vessels ready</span>
+      </div>
+    </div>
+
+    <!-- KPI 3: Est. Savings (KWD · mock) -->
+    <div class="surface-card kpi-accent-emerald p-3">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Est. Savings</span>
+        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-50 text-emerald-700 shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+        </span>
+      </div>
+      <div class="mt-1 flex items-baseline gap-1.5">
+        <span class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-emerald-700"
+              x-text="activeTab === 'solver' ? fmtInt(selectedKwd) : '{{ summary.kwd_saved|floatformat:0 }}'">{{ summary.kwd_saved|floatformat:0 }}</span>
+        <span class="text-xs font-semibold text-slate-500">KWD</span>
+        <span class="text-[10px] text-slate-400">· mock</span>
+        <span class="ml-auto text-[11px] text-slate-500 font-mono tabular-nums">fuel + ops</span>
+      </div>
+    </div>
+
+    <!-- KPI 4: CO2 Avoided & Mins Saved -->
+    <div class="surface-card kpi-accent-teal p-3">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">CO₂ Avoided &amp; Mins Saved</span>
+        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-teal-50 text-teal-700 shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+          </svg>
+        </span>
+      </div>
+      <div class="mt-1 flex items-baseline gap-1.5">
+        <span class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-slate-900"
+              x-text="activeTab === 'solver' ? fmtDec(selectedCo2) : '{{ summary.co2_kg_saved|floatformat:1 }}'">{{ summary.co2_kg_saved|floatformat:1 }}</span>
+        <span class="text-xs font-semibold text-slate-500">kg CO₂</span>
+        <span class="ml-auto text-[11px] text-slate-500 font-mono tabular-nums">
+          <span x-text="activeTab === 'solver' ? selectedMins : {{ summary.dispatcher_minutes_saved }}">{{ summary.dispatcher_minutes_saved }}</span> mins saved
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Band 3A: Shift Queue Solver Tab -->
+  <div x-show="activeTab === 'solver'"
+       {% if active_tab != 'solver' %}style="display: none;"{% endif %}
+       data-scroll-section
+       data-scroll-label="Shift Queue Solver"
+       class="grid grid-cols-1 lg:grid-cols-12 gap-3">
+
+    <!-- Left 8 Cols: Proposed Consolidation Merges + Approval Form -->
+    <section class="lg:col-span-8 surface-card overflow-hidden flex flex-col">
+      <div class="px-4 py-2 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <h2 class="text-sm font-semibold text-slate-900">Proposed Consolidation Merges</h2>
+          <span class="font-mono tabular-nums text-[11px] px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200 font-semibold">
+            {{ proposed_merges|length }} pair{{ proposed_merges|length|pluralize }}
+          </span>
+        </div>
+        <span class="text-[11px] text-slate-500 font-mono">
+          {% if allow_milk_run %}Same-Corridor + Milk-Run{% else %}Same-Corridor Only{% endif %} · {% if strict_weather %}HSE Strict Weather{% else %}Weather Advisory Mode{% endif %}
+        </span>
+      </div>
+
+      {% if proposed_merges %}
+      <form method="post"
+            action="{% url 'optimizer:approve' %}"
+            hx-post="{% url 'optimizer:approve' %}"
+            hx-target="#optimizer-workspace"
+            hx-swap="outerHTML"
+            hx-indicator="#approve-spinner"
+            hx-disabled-elt="#approve-plan-btn"
+            class="flex flex-col flex-1">
+        {% csrf_token %}
+        <input type="hidden" name="strict_weather" value="{{ strict_weather|yesno:'1,0' }}" />
+        <input type="hidden" name="allow_milk_run" value="{{ allow_milk_run|yesno:'1,0' }}" />
+
+        <div class="p-3 max-h-[380px] xl:max-h-[440px] overflow-y-auto pr-1 space-y-2.5">
+          {% for merge in proposed_merges %}
+          <div class="surface-card p-3 space-y-2 transition-all"
+               :class="selectedIds.includes('{{ merge.merge_id|escapejs }}') ? 'border-teal-300/80' : 'opacity-65 bg-slate-50/70'">
+            <!-- Card Header -->
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <label for="merge-check-{{ forloop.counter }}" class="flex items-center gap-2 cursor-pointer min-w-0">
+                <input id="merge-check-{{ forloop.counter }}"
+                       type="checkbox"
+                       name="merge_ids"
+                       value="{{ merge.merge_id }}"
+                       x-model="selectedIds"
+                       class="checkbox checkbox-primary checkbox-xs"
+                       {% if merge.checked_default %}checked{% endif %} />
+                <span class="text-xs font-semibold text-slate-900 truncate">{{ merge.route_label }}</span>
+                <span class="font-mono tabular-nums text-[11px] text-slate-500 shrink-0">
+                  {{ merge.recommended_departure_dt|date:"H:i" }} window
+                </span>
+              </label>
+
+              <div class="flex flex-wrap items-center gap-1.5">
+                {% if merge.mode == 'milk_run' %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-50 text-teal-800 border border-teal-200">
+                  Milk-Run
+                </span>
+                {% else %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                  Same Corridor
+                </span>
+                {% endif %}
+
+                {% if merge.vessel_reassigned %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-50 text-teal-800 border border-teal-200 font-mono tabular-nums">
+                  Right-Sized: {{ merge.primary_trip.vessel.vessel_id }} -&gt; {{ merge.assigned_vessel.vessel_id }}
+                </span>
+                {% endif %}
+
+                {% if merge.caution_flag %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-amber-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                    <path d="M12 9v4" /><path d="M12 17h.01" />
+                  </svg>
+                  {{ merge.caution_flag }}
+                </span>
+                {% endif %}
+
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono tabular-nums">
+                  -1 Trip · +{{ merge.kwd_saved|floatformat:0 }} KWD · {{ merge.fuel_saved_l|floatformat:0 }} L
+                </span>
+              </div>
+            </div>
+
+            <!-- Before -> After Diff Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-11 gap-2 items-center text-xs">
+              <div class="md:col-span-5 rounded-lg bg-amber-50/70 border border-amber-200/80 px-2.5 py-2 space-y-0.5">
+                <div class="font-semibold uppercase tracking-wider text-[10px] text-amber-800">Before (2 Separate Runs)</div>
+                <div class="font-mono tabular-nums text-[11px] text-slate-800">
+                  {{ merge.primary_trip.trip_id }} ({{ merge.primary_trip.vessel.vessel_id }} · {{ merge.primary_trip.passengers }} pax · {{ merge.primary_trip.cargo_tonnes|floatformat:1 }} t)
+                </div>
+                <div class="font-mono tabular-nums text-[11px] text-slate-700">
+                  + {{ merge.absorbed_trip.trip_id }} ({{ merge.absorbed_trip.vessel.vessel_id }} · {{ merge.absorbed_trip.passengers }} pax · {{ merge.absorbed_trip.cargo_tonnes|floatformat:1 }} t)
+                </div>
+              </div>
+
+              <div class="md:col-span-1 flex justify-center text-teal-700" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 rotate-90 md:rotate-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+                </svg>
+              </div>
+
+              <div class="md:col-span-5 rounded-lg bg-emerald-50/70 border border-emerald-200/80 px-2.5 py-2 space-y-0.5">
+                <div class="font-semibold uppercase tracking-wider text-[10px] text-emerald-800">After (1 Consolidated Sailing)</div>
+                <div class="font-mono tabular-nums text-[11px] font-semibold text-slate-900">
+                  {{ merge.assigned_vessel.vessel_id }} ({{ merge.assigned_vessel.vessel_type }}) · {{ merge.combined_util_pct|floatformat:0 }}% load
+                </div>
+                <div class="font-mono tabular-nums text-[11px] text-emerald-900">
+                  {{ merge.combined_pax }}/{{ merge.assigned_vessel.passenger_capacity }} pax · {{ merge.combined_cargo|floatformat:1 }}/{{ merge.assigned_vessel.cargo_capacity_t|floatformat:1 }} t · {{ merge.co2_kg_saved|floatformat:0 }} kg CO₂
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Compact Bottom Plan Approval Bar -->
+        <div class="px-4 py-2.5 border-t border-slate-200 bg-slate-50/80 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2 flex-1 min-w-[200px]">
+            <label for="plan-name-input" class="sr-only">Plan name</label>
+            <input id="plan-name-input"
+                   type="text"
+                   name="plan_name"
+                   maxlength="120"
+                   placeholder="Optional plan name (e.g. Shift A Consolidation)…"
+                   class="input input-bordered input-xs bg-white w-full max-w-xs text-xs" />
+          </div>
+
+          <div class="flex items-center gap-2.5 shrink-0">
+            <span class="font-mono tabular-nums text-xs text-slate-600">
+              <span x-text="selectedCount">{{ proposed_merges|length }}</span> / {{ proposed_merges|length }} selected
+            </span>
+            <button id="approve-plan-btn"
+                    type="submit"
+                    class="btn btn-primary btn-xs gap-1.5 font-semibold">
+              <span class="htmx-hide-on-request inline-flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                <span>Approve &amp; Save Plan</span>
+              </span>
+              <span id="approve-spinner" class="htmx-indicator items-center gap-1.5">
+                <span class="loading loading-spinner loading-xs"></span>
+                <span>Saving…</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      </form>
+      {% else %}
+      <!-- Clean Emerald Consolidated Empty State -->
+      <div class="p-6 text-center space-y-3 my-auto">
+        <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        </div>
+        <div class="space-y-1 max-w-md mx-auto">
+          <h3 class="text-sm font-semibold text-slate-900">Shift Queue Consolidated</h3>
+          <p class="text-xs text-slate-600">
+            No further compatible pending merges remain under current HSE guardrails and departure windows.
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
+          <button type="button"
+                  @click="activeTab = 'plans'"
+                  class="btn btn-primary btn-xs font-semibold">
+            View Saved Plans &amp; Backtest
+          </button>
+          <a href="{% url 'trips:index' %}?book=1"
+             class="btn btn-outline btn-xs border-slate-300 text-slate-700 hover:bg-slate-100">
+            Log New Trip
+          </a>
+        </div>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Right 4 Cols: Active HSE Guardrails + Held / Unmerged Queue -->
+    <aside class="lg:col-span-4 space-y-3">
+      <!-- Active HSE Guardrails Rose Card -->
+      <section class="rounded-xl border border-rose-200 bg-rose-50/80 border-l-4 border-l-rose-600 p-3 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-rose-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+            </svg>
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-rose-900">Active HSE Guardrails</h2>
+          </div>
+          <a href="{% url 'safety:index' %}" class="btn btn-xs bg-white border-rose-200 text-rose-800 hover:bg-rose-100">
+            Manage Holds
+          </a>
+        </div>
+
+        {% if active_overrides %}
+        <div class="max-h-[110px] overflow-y-auto pr-1 space-y-1.5">
+          {% for override in active_overrides %}
+          <div class="rounded-lg bg-white/90 border border-rose-200/80 px-2.5 py-1.5 text-xs">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-mono font-semibold text-rose-900 text-[11px]">
+                {% if override.vessel %}{{ override.vessel.vessel_id }}{% elif override.destination %}{{ override.destination }}{% else %}Fleet Rule{% endif %}
+              </span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider text-rose-700">
+                {{ override.get_rule_type_display }}
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-600 truncate mt-0.5">{{ override.reason }}</p>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-xs text-rose-800/80">No active HSE locks or holds enforcing exclusions.</p>
+        {% endif %}
+      </section>
+
+      <!-- Held / Unmerged Queue -->
+      <section class="surface-card overflow-hidden">
+        <div class="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between gap-2">
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-700">Held / Unmerged Queue</h2>
+          <span class="font-mono tabular-nums text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+            {{ held_trips|length }}
+          </span>
+        </div>
+
+        <div class="p-2.5 max-h-[240px] xl:max-h-[300px] overflow-y-auto space-y-1.5">
+          {% if held_trips %}
+          {% for item in held_trips %}
+          <div class="rounded-lg border border-slate-200/80 bg-slate-50/50 px-2.5 py-1.5 space-y-0.5">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="font-mono tabular-nums text-[11px] font-semibold text-slate-900 shrink-0">{{ item.trip.trip_id }}</span>
+                <span class="text-[11px] text-slate-600 truncate">{{ item.trip.vessel.vessel_id }} · {{ item.trip.destination }}</span>
+              </div>
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border shrink-0 {% if item.badge_tone == 'rose' %}bg-rose-50 text-rose-800 border-rose-200{% elif item.badge_tone == 'amber' %}bg-amber-50 text-amber-900 border-amber-200{% else %}bg-slate-100 text-slate-700 border-slate-200{% endif %}">
+                {{ item.badge_label }}
+              </span>
+            </div>
+            <div class="flex items-center justify-between gap-2 text-[10px] text-slate-500">
+              <span class="truncate">{{ item.reason }}</span>
+              <span class="font-mono tabular-nums shrink-0">{{ item.trip.departure_dt|date:"H:i" }} · {{ item.trip.utilization_pct|floatformat:0 }}%</span>
+            </div>
+          </div>
+          {% endfor %}
+          {% else %}
+          <p class="text-xs text-slate-500 py-4 text-center">All pending trips matched into proposed merges.</p>
+          {% endif %}
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <!-- Band 3B: Saved Plans & Backtest Tab -->
+  <div x-show="activeTab === 'plans'"
+       x-cloak
+       {% if active_tab != 'plans' %}style="display: none;"{% endif %}
+       data-scroll-section
+       data-scroll-label="Saved Plans & Backtest"
+       class="grid grid-cols-1 lg:grid-cols-12 gap-3">
+
+    <!-- Left 7 Cols: Persisted DispatchPlans Table -->
+    <section class="lg:col-span-7 surface-card overflow-hidden flex flex-col">
+      <div class="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between gap-2">
+        <div>
+          <h2 class="text-sm font-semibold text-slate-900">Persisted Shift Dispatch Plans</h2>
+          <p class="text-[11px] text-slate-500">Saved consolidation plans in PostgreSQL with 1-click queue revert</p>
+        </div>
+        <span class="font-mono tabular-nums text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold">
+          {{ approved_plans_count }} approved
+        </span>
+      </div>
+
+      <div class="max-h-[420px] overflow-y-auto overflow-x-auto">
+        <table class="table table-xs w-full">
+          <thead class="sticky top-0 z-10 bg-slate-50">
+            <tr class="text-slate-500 text-[10px] uppercase tracking-wider border-b border-slate-200">
+              <th>Plan &amp; Timestamp</th>
+              <th>Status</th>
+              <th class="text-right">-Trips</th>
+              <th class="text-right">Fuel (L)</th>
+              <th class="text-right">KWD</th>
+              <th class="text-right">CO₂ (kg)</th>
+              <th class="text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 text-xs">
+            {% for plan in saved_plans %}
+            <tr class="hover:bg-slate-50/80 transition-colors">
+              <td class="py-1.5">
+                <div class="font-semibold text-slate-900 truncate max-w-[190px]">{{ plan.name }}</div>
+                <div class="font-mono tabular-nums text-[10px] text-slate-400">{{ plan.created_at|date:"Y-m-d H:i" }}</div>
+              </td>
+              <td class="py-1.5">
+                {% if plan.is_approved %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  Approved
+                </span>
+                {% else %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                  Reverted
+                </span>
+                {% endif %}
+              </td>
+              <td class="py-1.5 text-right font-mono tabular-nums font-semibold text-teal-800">-{{ plan.trips_eliminated }}</td>
+              <td class="py-1.5 text-right font-mono tabular-nums text-slate-700">{{ plan.fuel_liters_saved|floatformat:1 }}</td>
+              <td class="py-1.5 text-right font-mono tabular-nums font-semibold text-emerald-700">{{ plan.kwd_saved|floatformat:0 }}</td>
+              <td class="py-1.5 text-right font-mono tabular-nums text-slate-600">{{ plan.co2_kg_saved|floatformat:1 }}</td>
+              <td class="py-1.5 text-right">
+                {% if plan.is_approved %}
+                <form method="post"
+                      action="{% url 'optimizer:revert_plan' plan.pk %}"
+                      hx-post="{% url 'optimizer:revert_plan' plan.pk %}"
+                      hx-target="#optimizer-workspace"
+                      hx-swap="outerHTML"
+                      hx-indicator="#revert-spinner-{{ plan.pk }}"
+                      hx-disabled-elt="#revert-btn-{{ plan.pk }}"
+                      class="inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="strict_weather" value="{{ strict_weather|yesno:'1,0' }}" />
+                  <input type="hidden" name="allow_milk_run" value="{{ allow_milk_run|yesno:'1,0' }}" />
+                  <button id="revert-btn-{{ plan.pk }}"
+                          type="submit"
+                          class="btn btn-outline btn-xs border-rose-200 text-rose-800 hover:bg-rose-50 hover:border-rose-300">
+                    <span class="htmx-hide-on-request">Revert Plan</span>
+                    <span id="revert-spinner-{{ plan.pk }}" class="htmx-indicator items-center gap-1">
+                      <span class="loading loading-spinner loading-xs"></span>
+                      <span>Reverting…</span>
+                    </span>
+                  </button>
+                </form>
+                {% else %}
+                <span class="text-[11px] text-slate-400 font-mono">Restored</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="py-8 text-center text-xs text-slate-500">
+                No saved shift dispatch plans yet. Select merges on <button type="button" @click="activeTab = 'solver'" class="text-teal-700 font-semibold underline">Shift Queue Solver</button> to approve one.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Right 5 Cols: 90-Day Historical Backtest Summary + 5-Corridor Table -->
+    <aside class="lg:col-span-5 space-y-3">
+      <section class="surface-card kpi-accent-emerald p-3.5 space-y-2.5">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <h2 class="text-sm font-semibold text-slate-900">90-Day Historical Backtest</h2>
+            <p class="text-[11px] text-slate-500">Baseline consolidation potential across completed KJO sailings</p>
+          </div>
+          <span class="font-mono tabular-nums text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
+            {{ backtest.historical_trips }} runs
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div class="rounded-lg bg-slate-50 border border-slate-200/80 px-2.5 py-2">
+            <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Trips Eliminated</div>
+            <div class="mt-0.5 font-mono tabular-nums text-base font-bold text-slate-900">
+              {{ backtest.trips_eliminated }} <span class="text-[11px] font-medium text-slate-500">merges</span>
+            </div>
+          </div>
+          <div class="rounded-lg bg-emerald-50/70 border border-emerald-200/80 px-2.5 py-2">
+            <div class="text-[10px] font-semibold uppercase tracking-wider text-emerald-800">Diesel Saved</div>
+            <div class="mt-0.5 font-mono tabular-nums text-base font-bold text-emerald-700">
+              {{ backtest.fuel_saved_l|floatformat:"0g" }} <span class="text-[11px] font-medium text-slate-500">L</span>
+            </div>
+          </div>
+          <div class="rounded-lg bg-emerald-50/70 border border-emerald-200/80 px-2.5 py-2">
+            <div class="text-[10px] font-semibold uppercase tracking-wider text-emerald-800">Est. Savings</div>
+            <div class="mt-0.5 font-mono tabular-nums text-base font-bold text-emerald-700">
+              {{ backtest.kwd_saved|floatformat:"0g" }} <span class="text-[11px] font-medium text-slate-500">KWD · mock</span>
+            </div>
+          </div>
+          <div class="rounded-lg bg-slate-50 border border-slate-200/80 px-2.5 py-2">
+            <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">CO₂ Avoided</div>
+            <div class="mt-0.5 font-mono tabular-nums text-base font-bold text-slate-900">
+              {{ backtest.co2_tonnes|floatformat:1 }} <span class="text-[11px] font-medium text-slate-500">t CO₂</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="surface-card overflow-hidden">
+        <div class="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between gap-2">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-700">5-Corridor Breakdown</h3>
+          <span class="text-[10px] text-slate-500 font-mono">90-day opportunity</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="table table-xs w-full">
+            <thead>
+              <tr class="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-wider border-b border-slate-200">
+                <th>Corridor</th>
+                <th class="text-right">Merges</th>
+                <th class="text-right">Fuel Saved (L)</th>
+                <th class="text-right">Idle Fuel (L)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-xs">
+              {% for row in backtest.corridors %}
+              <tr class="hover:bg-slate-50/80">
+                <td class="py-1.5 font-medium text-slate-800">{{ row.destination }}</td>
+                <td class="py-1.5 text-right font-mono tabular-nums font-semibold text-teal-800">{{ row.merges }}</td>
+                <td class="py-1.5 text-right font-mono tabular-nums font-semibold text-emerald-700">{{ row.merge_fuel_l|floatformat:"0g" }}</td>
+                <td class="py-1.5 text-right font-mono tabular-nums text-amber-800">{{ row.idle_fuel_l|floatformat:"0g" }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="4" class="py-4 text-center text-xs text-slate-500">No historical corridor data available.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>

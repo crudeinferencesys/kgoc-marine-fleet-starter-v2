@@ -128,6 +128,16 @@
                 class="btn btn-xs rounded-full border {% if filters.anomaly == 'high' %}bg-rose-600 text-white border-rose-600{% else %}bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100/80{% endif %}">
           Fuel Outliers <span class="font-mono tabular-nums">{{ preset_counts.outliers }}</span>
         </button>
+
+        {% if preset_counts.consolidated > 0 %}
+        <button type="button"
+                hx-get="{% url 'trips:ledger' %}?status=consolidated&per_page={{ filters.per_page }}"
+                hx-target="#trips-ledger-panel"
+                hx-swap="outerHTML"
+                class="btn btn-xs rounded-full border {% if filters.status == 'consolidated' %}bg-emerald-600 text-white border-emerald-600{% else %}bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100/80{% endif %}">
+          Consolidated <span class="font-mono tabular-nums">{{ preset_counts.consolidated }}</span>
+        </button>
+        {% endif %}
       </div>
     </div>
 
@@ -162,7 +172,7 @@
 
   <!-- Active Removable Filter Chips Bar -->
   {% if filters.vessel or filters.vessel_type or filters.destination or filters.mission_type or filters.flexible_window or filters.min_pax or filters.min_cargo or filters.half_empty == '1' or filters.load_band or filters.anomaly or filters.weather or filters.priority or filters.idle_only == '1' or filters.q or filters.status and filters.status != 'all' %}
-  <div class="px-4 py-1.5 bg-slate-50 border-b border-slate-100 flex flex-wrap items-center gap-1.5 text-[11px]">
+  <div class="px-4 py-1 bg-slate-50 border-b border-slate-100 flex flex-wrap items-center gap-1.5 text-[10px]">
     <span class="font-semibold uppercase tracking-wider text-slate-400 mr-1 text-[10px]">Active:</span>
 
     {% if filters.status and filters.status != 'all' %}
@@ -330,7 +340,7 @@
       <tbody class="divide-y divide-slate-100 text-xs">
         {% for trip in page_obj %}
         <tr class="hover:bg-slate-50/80 transition-colors">
-          <td class="py-1.5">
+          <td class="py-1">
             <div class="flex items-center gap-1.5">
               <button type="button"
                       hx-get="{% url 'trips:inspect' trip.trip_id %}"
@@ -346,7 +356,7 @@
             </div>
           </td>
 
-          <td class="py-1.5">
+          <td class="py-1">
             <div class="flex items-center gap-1.5">
               <span class="font-mono text-xs font-semibold text-slate-900">{{ trip.vessel.vessel_id }}</span>
               <span class="text-slate-400">·</span>
@@ -355,7 +365,7 @@
             </div>
           </td>
 
-          <td class="py-1.5 text-right">
+          <td class="py-1 text-right">
             <div class="flex items-center justify-end gap-2">
               <span class="hidden sm:inline font-mono tabular-nums text-[11px] text-slate-500">
                 {{ trip.passengers }}/{{ trip.vessel.passenger_capacity }}p · {{ trip.cargo_tonnes|floatformat:1 }}/{{ trip.vessel.cargo_capacity_t|floatformat:1 }}t
@@ -370,7 +380,7 @@
             </div>
           </td>
 
-          <td class="py-1.5">
+          <td class="py-1">
             <div class="flex flex-wrap items-center gap-1">
               <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium {% if trip.weather == 'Rough' %}bg-rose-50 text-rose-800 border border-rose-200{% elif trip.weather == 'Moderate' %}bg-amber-50 text-amber-900 border border-amber-200{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
                 {{ trip.weather }}
@@ -396,7 +406,7 @@
             </div>
           </td>
 
-          <td class="py-1.5 text-right">
+          <td class="py-1 text-right">
             <div class="flex items-center justify-end gap-1">
               <button type="button"
                       hx-get="{% url 'trips:inspect' trip.trip_id %}"
@@ -421,8 +431,8 @@
                 Cancel
               </button>
               {% elif trip.status == 'consolidated' %}
-              <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
-                Consolidated
+              <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+                <span>Consolidated</span>{% if trip.consolidated_into %}<span class="font-mono tabular-nums">→ {{ trip.consolidated_into.trip_id }}</span>{% endif %}
               </span>
               {% elif trip.status == 'cancelled' %}
               <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200">

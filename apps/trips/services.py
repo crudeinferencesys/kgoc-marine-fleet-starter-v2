@@ -229,11 +229,16 @@ def filter_trips(params: Mapping[str, Any], *, default_per_page: int = 25) -> di
         per_page = default_per_page
 
     all_non_cancelled = list(
-        Trip.objects.select_related("vessel").exclude(status="cancelled")
+        Trip.objects.select_related("vessel", "consolidated_into", "dispatch_plan").exclude(
+            status="cancelled"
+        )
     )
     status_counts = {
         "all": len(all_non_cancelled),
         "pending": sum(1 for trip in all_non_cancelled if trip.status == "pending"),
+        "consolidated": sum(
+            1 for trip in all_non_cancelled if trip.status == "consolidated"
+        ),
         "completed": sum(1 for trip in all_non_cancelled if trip.status == "completed"),
     }
     preset_counts = {
@@ -248,7 +253,7 @@ def filter_trips(params: Mapping[str, Any], *, default_per_page: int = 25) -> di
         "rough_weather": sum(1 for trip in all_non_cancelled if trip.weather == "Rough"),
     }
 
-    qs = Trip.objects.select_related("vessel")
+    qs = Trip.objects.select_related("vessel", "consolidated_into", "dispatch_plan")
     if status == "all":
         qs = qs.exclude(status="cancelled")
     else:
@@ -293,10 +298,11 @@ def filter_trips(params: Mapping[str, Any], *, default_per_page: int = 25) -> di
     if anomaly:
         trips = [trip for trip in trips if trip.fuel_anomaly_status == anomaly]
 
-    # Pending queue rows always appear before historical rows: live bookings first, then chronological shift departures.
+    # Pending queue rows first, consolidated second, completed historical sailings third.
+    status_rank = {"pending": 0, "consolidated": 1, "completed": 2}
     trips.sort(
         key=lambda t: (
-            0 if t.status == "pending" else 1,
+            status_rank.get(t.status, 3),
             0 if (t.status == "pending" and t.trip_id.startswith("TR-LIVE-")) else 1,
             (
                 -t.created_at.timestamp()

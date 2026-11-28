@@ -17,7 +17,7 @@ from apps.core.ai import (
     DispatchBriefing,
     generate_structured,
 )
-from apps.core.models import SafetyOverride, Trip, Vessel, VesselAvailability
+from apps.core.models import DispatchPlan, SafetyOverride, Trip, Vessel, VesselAvailability
 from apps.core.services import get_control_tower_metrics
 
 
@@ -396,3 +396,69 @@ class CoreSmokeTests(TestCase):
         ping_response = self.client.post(reverse("core:copilot:ping"))
         self.assertEqual(ping_response.status_code, 200)
         self.assertContains(ping_response, "HTMX POST + CSRF verified")
+
+    def test_control_tower_metrics_aggregates_approved_dispatch_plans(self):
+        empty_metrics = get_control_tower_metrics()
+        self.assertEqual(empty_metrics["approved_plans_count"], 0)
+        self.assertEqual(empty_metrics["approved_plans_trips_eliminated"], 0)
+        self.assertEqual(empty_metrics["approved_plans_fuel_saved_l"], 0.0)
+        self.assertEqual(empty_metrics["approved_plans_kwd_saved"], 0.0)
+
+        DispatchPlan.objects.create(
+            name="Shift Plan A",
+            scope="pending",
+            baseline_trips=6,
+            optimized_trips=4,
+            trips_eliminated=2,
+            fuel_liters_saved=450.25,
+            kwd_saved=215.555,
+            is_approved=True,
+        )
+        DispatchPlan.objects.create(
+            name="Shift Plan B",
+            scope="pending",
+            baseline_trips=4,
+            optimized_trips=3,
+            trips_eliminated=1,
+            fuel_liters_saved=200.1,
+            kwd_saved=100.111,
+            is_approved=True,
+        )
+        DispatchPlan.objects.create(
+            name="Reverted Plan C",
+            scope="pending",
+            baseline_trips=8,
+            optimized_trips=3,
+            trips_eliminated=5,
+            fuel_liters_saved=999.0,
+            kwd_saved=999.0,
+            is_approved=False,
+        )
+
+        metrics = get_control_tower_metrics()
+        self.assertEqual(metrics["approved_plans_count"], 2)
+        self.assertEqual(metrics["approved_plans_trips_eliminated"], 3)
+        self.assertEqual(metrics["approved_plans_fuel_saved_l"], 650.4)
+        self.assertEqual(metrics["approved_plans_kwd_saved"], 315.67)
+
+    def test_control_tower_renders_approved_dispatch_plan_pill_when_present(self):
+        before_resp = self.client.get(reverse("core:home"))
+        self.assertEqual(before_resp.status_code, 200)
+        self.assertNotContains(before_resp, "live plan")
+
+        DispatchPlan.objects.create(
+            name="Approved Shift Run",
+            scope="pending",
+            baseline_trips=6,
+            optimized_trips=4,
+            trips_eliminated=2,
+            fuel_liters_saved=420.0,
+            kwd_saved=210.0,
+            is_approved=True,
+        )
+
+        after_resp = self.client.get(reverse("core:home"))
+        self.assertEqual(after_resp.status_code, 200)
+        self.assertContains(after_resp, "1 live plan")
+        self.assertContains(after_resp, "-2 trips")
+        self.assertContains(after_resp, "+210 live")
