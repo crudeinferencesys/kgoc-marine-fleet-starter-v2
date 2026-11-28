@@ -7,14 +7,14 @@ Index of active specifications, frozen boundaries, and team ownership.
 |---|---|---|
 | [hackathon_brief.md](../hackathon_brief.md) | Official KGOC + CODED workshop rules & Theme 4 summary | Reference |
 | [architecture.md](architecture.md) | Stack, GCP Cloud Run + Cloud SQL, HTMX, Gemini AI wrapper | Locked |
-| [design-system.md](design-system.md) | Maritime Control Tower palette, typography, KPI/table/HTMX/AI/Chart.js recipes | Locked — follow for all UI & charts |
-| [mvp-spec.md](mvp-spec.md) | Theme 4 dataset schema, Control Tower, 3 core features, Actionable AI, KWD math | Pre-Kickoff Blueprint Locked — confirm columns at 11:00 AM |
+| [design-system.md](design-system.md) | Maritime Control Tower palette, `48px` chrome, zero-scroll contract, modal/workflow patterns | Locked — follow for all UI & charts |
+| [mvp-spec.md](mvp-spec.md) | Theme 4 dataset schema, shipped Control Tower / Features 1–2, Feature 3 & 4 contracts, KWD math | Synced with Shipped Features 1 & 2 + Feature 3 Contract |
 
-## Vertical Slice Ownership
-| Slice | Paths | Owner |
+## Vertical Slice Ownership & Live Status
+| Slice | Paths | Owner & Status |
 |---|---|---|
-| Core Shell & Frozen Schema | `apps/core/`, `templates/base.html`, `config/` | Shared (Salman freezes schema PR at 11:15–11:40 AM) |
-| Control Tower + Feature 1: Trips & Utilization | `apps/trips/`, `templates/trips/`, `templates/core/home.html` | **Salman** (Laptop A) |
-| Feature 2: Dispatch Optimizer | `apps/optimizer/views.py`, `urls.py`, `templates/optimizer/index.html` | **Saleh** (Laptop B) |
-| Feature 3: Safety & Fuel Anomaly Guard | `apps/safety/`, `templates/safety/` | **First Finisher** (Coordinate) |
-| Feature 4 (Bonus AI): AI Dispatch Co-Pilot (`/copilot/`) | `apps/optimizer/copilot_urls.py`, `copilot_views.py`, `templates/optimizer/copilot.html` | **Saleh** (Laptop B, after Feature 2) |
+| Core Shell & Frozen Schema | `apps/core/models.py`, `constants.py`, `ai.py`, `templates/base.html`, `config/` | Shared (**Frozen**; slim `48px` chrome shipped) |
+| Control Tower (`/`) + Feature 1 (`/trips/`) | `apps/core/services.py`, `templates/core/home.html`, `apps/trips/**`, `templates/trips/**` | **Salman** — **Shipped** |
+| Feature 2: Dispatch Optimizer (`/optimizer/`) | `apps/optimizer/services.py`, `views.py`, `urls.py`, `tests.py`, `templates/optimizer/index.html`, `partials/workspace.html` | **Salman** — **Shipped** |
+| Feature 3: Safety & Fuel Guard (`/safety/`) | `apps/safety/**`, `templates/safety/**` | **Saleh** — **Active** (SafetyOverrides + Fuel Anomalies + 720 `VesselAvailability` rows) |
+| Feature 4 (Bonus AI): AI Dispatch Co-Pilot (`/copilot/`) | `apps/optimizer/copilot_urls.py`, `copilot_views.py`, `templates/optimizer/copilot.html` | **Next Sprint** (Scaffold live at `core:copilot:index`) |

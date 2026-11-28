@@ -7,10 +7,14 @@
 
 ## 1. Mission & Judging Guardrails (Non-Negotiable)
 - **Theme:** Theme 4 — Marine Fleet Utilization & Optimization (8 vessels / 976 trips dataset + synthetic extensions clearly labeled as mock data).
-- **Hard Scope Limit:** Build **at most 3 working core features** + **1 embedded Bonus AI feature**. Never add dark mode toggles, auth/login screens, static fluff, or extra sub-pages that dilute the 3 core features.
-- **No Login Wall:** Every judging URL (`/`, `/trips/`, `/optimizer/`, `/safety/`) MUST be publicly accessible without authentication.
-- **Persist to Database:** User inputs (new trips, approved optimization plans, safety overrides) MUST save to the database (`apps/core/models.py` / slice models -> Cloud SQL PostgreSQL in prod).
-- **Quantify Impact (Pillar 4):** Every optimization/anomaly view must show concrete estimated savings (trips eliminated, fuel liters saved, KWD saved, or supervisor hours saved).
+- **Hard Scope Limit:** Build **at most 3 working core features** + **1 standalone Bonus AI feature** (`/copilot/`). Never add dark mode toggles, auth/login screens, static fluff, or extra sub-pages that dilute the core features.
+- **No Login Wall:** Every judging URL (`/`, `/trips/`, `/optimizer/`, `/safety/`, `/copilot/`, `/health/`) MUST be publicly accessible without authentication.
+- **Persist to Database:** User inputs (new trips, approved/reverted optimization plans, safety overrides, AI handovers) MUST save to the database (`apps/core/models.py` -> Cloud SQL PostgreSQL in prod).
+- **Quantify Impact (Pillar 4):** Every optimization/anomaly view must show concrete estimated savings (trips eliminated, fuel liters saved, KWD saved, CO₂ avoided, or supervisor minutes saved) clearly qualified as `· mock`.
+- **KJO Workbook Operating Constraints (`START HERE` / `Theme_Brief` / `Idea_Starters`):**
+  - Frame high fuel-burn outliers (`>= 1.30x`) strictly as **engineering investigation flags** (never misconduct/theft accusations), and treat the 15 blank `Actual_Fuel_L` rows explicitly as **`Missing Telemetry Log`** (never zero fuel).
+  - Never override marine safety or weather restrictions (`SafetyOverride` locks + `HSE Strict Weather` default ON).
+  - Uphold `docs/designs/design-system.md`: **Zero-Scroll Desktop Contract (`>= 1280×760`)**, slim `48px` topbar (`templates/base.html`), zero developer/DB/model pills inside executive pages, and zero duplicate cross-page nav buttons.
 
 ---
 
@@ -23,9 +27,10 @@ Two AI agents are editing this repository in parallel, and merging to `main` **a
 2. **Pull before branching:**
    - Start every task from an up-to-date `main`: `git fetch origin && git checkout -b feat/<slice>-<task> origin/main`.
 3. **Respect Slice Ownership (Prevent Merge Conflicts):**
-   - **Teammate A owns:** `apps/trips/**` and `templates/trips/**`
-   - **Teammate B owns:** `apps/optimizer/**` and `templates/optimizer/**`
-   - **Coordinate verbally before touching:** `apps/safety/**`, `templates/safety/**`, `apps/core/**`, `docs/designs/**`
+   - **Salman (Teammate A) owns:** Control Tower (`/`), Feature 1 (`apps/trips/**`, `templates/trips/**` — **Shipped**), and Feature 2 (`apps/optimizer/services.py`, `views.py`, `urls.py`, `tests.py`, `templates/optimizer/index.html`, `partials/workspace.html` — **Shipped**).
+   - **Saleh (Teammate B) owns:** Feature 3 (`apps/safety/**`, `templates/safety/**` — **Active**; surface physics fuel anomalies, live `SafetyOverride` CRUD, and the 720 seeded `VesselAvailability` rows).
+   - **Feature 4 (Bonus AI `/copilot/`):** `apps/optimizer/copilot_urls.py`, `apps/optimizer/copilot_views.py`, `templates/optimizer/copilot.html` (**Next sprint** — coordinate verbally before editing).
+   - **Coordinate verbally before touching:** `apps/core/**`, `docs/designs/**`.
 4. **FROZEN SHARED FILES (DO NOT MODIFY WITHOUT EXPLICIT HUMAN APPROVAL IN CHAT):**
    - `apps/core/models.py` (shared schema & migrations — freezing prevents `0002` migration graph collisions!)
    - `config/settings.py`
@@ -64,7 +69,7 @@ Two AI agents are editing this repository in parallel, and merging to `main` **a
   - Rely on the global `hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'` already set on `<body>`.
   - Keep HTMX responses as small, focused HTML partials under `templates/<slice>/partials/`.
   - Design mobile-responsive layouts (`grid-cols-1 md:grid-cols-...`, DaisyUI cards/tables/badges).
-- **Bonus AI Feature:** Always call Gemini through `apps/core/ai.py` (`generate_structured(...)`) using **`gemini-4-hydrogen`** (`GEMINI_MODEL=gemini-4-hydrogen` in `.env` and Cloud Run) on the **`google-genai >= 3.5.0` Interactions API** (`client.interactions.create(...)`) + Pydantic schemas. **NEVER** use deprecated/legacy models (`gemini-2.5-*`, `gemini-2.0-*`, `gemini-1.5-*`), **NEVER** import legacy `google-generativeai`, and **NEVER** pass deprecated `temperature`/`top_p`/`top_k` to Gemini 4 (tune `thinking_level` instead). Every AI-powered endpoint MUST include a deterministic fallback message/output when `GEMINI_API_KEY` is unset or times out.
+- **Bonus AI Feature:** Always call Gemini through `apps/core/ai.py` (`generate_structured(...)`) using **`gemini-4-hydrogen`** (`GEMINI_MODEL=gemini-4-hydrogen` in `.env` and Cloud Run) on the **`google-genai >= 3.5.0` Interactions API** (`client.interactions.create(...)`) + Pydantic schemas (`DispatchBriefing`, `MergeRiskAssessment`, `ActionableDispatchBriefing`). **NEVER** use deprecated/legacy models (`gemini-2.5-*`, `gemini-2.0-*`, `gemini-1.5-*`), **NEVER** import legacy `google-generativeai`, and **NEVER** pass deprecated `temperature`/`top_p`/`top_k` to Gemini 4 (tune `thinking_level` instead). Every AI-powered endpoint MUST include a deterministic fallback message/output when `GEMINI_API_KEY` is unset or times out.
 
 ---
 
