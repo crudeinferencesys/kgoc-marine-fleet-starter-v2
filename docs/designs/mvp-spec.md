@@ -1,6 +1,6 @@
 # MVP Specification — Theme 4: Marine Fleet Utilization & Optimization
 
-> **Status:** Schema Frozen (11:45 AM) — `apps/core/models.py`, `apps/core/constants.py`, `0001_initial.py`, and `seed_fleet` are locked on `main`. Both slices build cleanly on these shared contracts.
+> **Status:** Schema Frozen — Features 1 (`/trips/`) and 2 (`/optimizer/`) + Executive Control Tower (`/`) are **shipped on `main`**; Feature 3 (`/safety/`) is active with Saleh, followed by Feature 4 (`/copilot/`).
 
 ---
 
@@ -16,12 +16,12 @@
   - **`Vessels` (8 rows):** `Vessel_ID` (`CB-01`–`CB-08`), `Vessel_Type`, `Passenger_Capacity`, `Cargo_Capacity_T`, `Underway_Rate_Lph`, `Idle_Rate_Lph`, `Cruise_Speed_kn`, `Shift_Hours_per_Day` (12), `Status`.
   - **`Trips` (976 rows) + `Requests` (976 rows, exact 1:1 join on `Trip_ID`):** Date range `2026-08-26` → `2026-11-23` (90 days). `Origin` (`Marine Base`), `Destination` (`Platform A/B/C`, `Offshore Terminal`, `Maintenance Area`), `Mission_Type` (`Passenger Transfer`, `Material Delivery`, `Maintenance Support`), `Departure_DT`, `Return_DT`, `Earliest_Departure_DT`, `Latest_Departure_DT`, `Underway_Hours`, `Onsite_Work_Hours`, `Nonproductive_Idle_Hours`, `Distance_nm`, `Passengers` (0–14), `Cargo_Tonnes` (0–6.72), `Weather` (`Calm`/`Moderate`/`Rough`), `Priority` (`Routine`/`Urgent`/`Critical`), `Flexible_Window` (`Yes`/`No`, 752 flexible), `Actual_Fuel_L`.
   - **`Availability` (720 rows = 8 × 90 days):** `Available` (585), `Weather Restricted` (97), `Maintenance` (38).
-- **Key Edge Cases & Operating Rules Observed:**
-  - **15 blank `Actual_Fuel_L` rows:** Treated as `"missing"` telemetry logs rather than zero fuel.
-  - **Physics-based fuel anomalies:** Expected fuel = `(Underway_Hours × Underway_Rate_Lph) + ((Onsite_Work_Hours + Nonproductive_Idle_Hours) × Idle_Rate_Lph)`. Yields 22 severe high-burn outliers (`≥ 1.30×`, up to `2.07×` on `TR-00012 CB-08`) and 8 suspiciously low readings (`≤ 0.70×`). Per KJO guidance, alerts are framed as **engineering investigation flags** (never misconduct accusations).
-  - **Productive vs. Non-productive waiting:** `Onsite_Work_Hours` is productive offshore support; `Nonproductive_Idle_Hours` (572.6 h total) is avoidable idle fuel waste.
-  - **Consolidation potential:** 616 / 976 trips (63.1%) are under 50% max capacity, with ~168 mergeable same-day overlapping flexible pairs.
-  - **Standby vessel:** `CB-07` (54 historical trips vs 115–155 for peers) is seeded with an active `standby_lock` `SafetyOverride`.
+- **Key Edge Cases & Operating Rules Observed (Live Seeded DB):**
+  - **15 blank `Actual_Fuel_L` rows:** Explicitly handled as `"missing"` telemetry logs (`Missing Telemetry Log`) rather than zero fuel.
+  - **Physics-based fuel anomalies:** Expected fuel = `(Underway_Hours × Underway_Rate_Lph) + ((Onsite_Work_Hours + Nonproductive_Idle_Hours) × Idle_Rate_Lph)`. Yields **39 severe high-burn outliers** (`>= 1.30×`, up to `2.07×` on `TR-00012 CB-08`), **8 low readings** (`<= 0.70×`), **15 missing logs**, and **914 nominal runs** across `976` completed trips. Per KJO `Idea_Starters` guidance, alerts are strictly framed as **engineering investigation flags** (never misconduct accusations).
+  - **Productive vs. Non-productive waiting:** `Onsite_Work_Hours` (**374.5 h**) is productive offshore support; `Nonproductive_Idle_Hours` (**572.6 h**, **13,440 L** diesel) is avoidable idle fuel waste.
+  - **Consolidation potential:** **616 / 976 trips (63.1%)** sail under 50% max capacity (**43.2%** avg max utilization, **35.8%** avg pax utilization), with **169 greedy backtest merges** (**41,132 L** diesel, **29,640 KWD**, **110.2 t CO₂** *mock*).
+  - **Standby vessel & availability (`720` `VesselAvailability` rows):** `CB-07` (`54` historical trips vs `115–155` for peers) is seeded with an active `standby_lock` `SafetyOverride`; daily `VesselAvailability` tracks `Available` (`585`), `Weather Restricted` (`97`), and `Maintenance` (`38`).
 - **Dual-Mode Lifecycle:**
   - `seed_fleet --if-empty` (auto-run in `entrypoint.sh` on Cloud Run startup) loads 8 `Vessel`s, 720 `VesselAvailability` rows, 976 `completed` historical `Trip`s, **12 mock `pending` shift queue `Trip`s** (`TR-QUEUE-01`–`12` with clean pairs, rough-weather pair, standby-locked pair, fixed critical run, and high-load run), and **1 active `standby_lock` on `CB-07`**.
 
@@ -38,30 +38,33 @@ Portable Django ORM fields only (SQLite + Cloud SQL PostgreSQL parity).
 
 ---
 
-## 4. Control Tower + 3 Standalone Core Features + 1 Embedded Bonus AI
+## 4. Control Tower + 3 Standalone Core Features + 1 Standalone Bonus AI
 
-### Executive Control Tower (`/` — Salman)
-- **Role:** Public landing hub (zero login wall, all developer starter text removed).
-- **Live DB Readouts:** Live KPI strip (Fleet Utilization %, Half-Empty Runs, Est. 90-Day KWD / Fuel / CO₂ Savings, Active HSE Holds), one Chart.js fleet utilization visual, and 3 clear action cards into Features 1–3.
+### Executive Control Tower (`/` — Shipped, Salman)
+- **Role:** Zero-scroll public landing cockpit (`1280×800` & `1440×900`) on a slim `48px` navy topbar (`AI Co-Pilot →` CTA in `topbar_actions`, zero Band-1 title/dev clutter).
+- **Live DB Readouts:** 4 clickable KPI drill-down cards (`Fleet Utilization → /trips/`, `Half-Empty Sailings → /trips/?half_empty=1`, `Est. 90-Day Savings` + live approved plan pill `→ /optimizer/`, `HSE & Fuel Flags → /safety/`) over a 2×2 clickable Chart.js grid (Vessel Utilization vs. Volume, Half-Empty vs. Healthy Runs by Destination, Consolidation Savings vs. Avoidable Idle Fuel, Fuel Telemetry & HSE Readiness Health with live `CB-07 Standby Lock` pill).
 
-### Feature 1 — Trip Ticketing & Utilization Ledger (`apps/trips/`, Salman)
-- **Goal:** Track utilization KPIs across all 976 historical trips (plus non-productive idle fuel vs. productive onsite support) and provide an HTMX trip booking form that saves new `pending` trip requests directly to PostgreSQL.
-- **Standalone & Testable:** Judges submit a new crew/cargo trip request -> saved to DB -> utilization bar and half-empty flag appear immediately, and the `pending` trip enters `/optimizer/`.
+### Feature 1 — Trip Ticketing & Utilization Ledger (`/trips/` — Shipped, Salman)
+- **Goal:** Zero-scroll 2-tab workspace (`Trip Ledger` and 3-step `Log New Trip` workflow) across all 976 historical trips, 12 seeded queue requests, and live PostgreSQL shift bookings, with server-side vessel overload protection, quick presets (including conditional Emerald `Consolidated` chip & `→ <trip_id>` badge), categorized `More Filters` modal, filtered CSV export, and centered `#trip-inspector-modal` (`KWD` fuel telemetry, corridor siblings, `Dispatch Consolidation` banner).
+- **Standalone & Testable:** Judges submit a new crew/cargo trip request -> saved to PostgreSQL -> utilization bar and half-empty flag update cleanly and enter `/optimizer/`.
 
-### Feature 2 — Dispatch Consolidation Optimizer (`apps/optimizer/`, Saleh)
-- **Goal:** Python solver consolidating `pending` shift trips within passenger/cargo/time-window (`flexible_window`, `[earliest_departure_dt, latest_departure_dt]`) and active `SafetyOverride` HSE constraints, plus a 90-day historical backtest headline across the 976 completed trips (~168 mergeable pairs).
-- **Standalone & Testable:** Judges click **Run Consolidation Solver** -> inspect Before → After diff cards, trips eliminated, fuel liters saved, KWD saved, CO₂ reduced, and dispatcher minutes saved -> click **Approve & Save Plan** to persist `DispatchPlan` (and update consolidated trips) in PostgreSQL. Links cleanly to the standalone 4th AI feature (`/copilot/`).
+### Feature 2 — Dispatch Consolidation Optimizer (`/optimizer/` — Shipped, Salman)
+- **Goal:** Gulf OSV zero-scroll 2-tab workspace (`Shift Queue Solver` and `Saved Plans & Backtest`):
+  - **Same-Corridor Consolidation (`0.08` detour penalty) + Lowest-Cost Carrier Right-Sizing** across eligible `In Service` vessels.
+  - **Optional `Allow Milk-Run` Toggle (`0.18` detour penalty):** Multi-stop consolidation across adjacent platforms (`Platform A ↔ Platform B ↔ Platform C`) for unpaired flexible runs.
+  - **Hard HSE & Weather Guardrails:** Always blocks active `SafetyOverride` vessels/destinations (`CB-07 Standby Lock`), plus configurable **`HSE Strict Weather`** toggle (ON by default; OFF adds an amber `Rough Sea Advisory` for explicit supervisor sign-off) and explicit unmerged reasons in the `Held / Unmerged Queue`.
+  - **Approve & Revert Persistence:** Checkbox cherry-picking -> atomic **`Approve & Save Plan`** (`DispatchPlan` + `consolidated` `Trip` linkage + `/` & `/trips/` cross-slice updates) + 1-click **`Revert Plan`** to restore pending runs and original vessels.
 
-### Feature 3 — Safety & Fuel Anomaly Guard (`apps/safety/`, First Finisher)
-- **Goal:** Detect physics-based fuel-burn outliers (`actual_fuel_l / expected_fuel_l >= 1.30` or `<= 0.70`, plus 15 missing logs) framed as engineering investigation flags across the 976 trips, and enforce **3 live PostgreSQL `SafetyOverride` HSE rules** constraining `/optimizer/` and `/copilot/`:
-  1. **Sea-State / Weather Hold** on a destination/zone or Rough weather.
-  2. **Vessel Maintenance Hold** (1-click trigger directly from any flagged fuel anomaly).
+### Feature 3 — Safety & Fuel Anomaly Guard (`/safety/` — Active, Saleh)
+- **Goal:** Detect physics-based fuel-burn outliers (`39` severe high outliers `>= 1.30×` up to `2.07×`, `8` low readings `<= 0.70×`, `15` missing logs) framed strictly as engineering investigation flags, surface vessel operational readiness across the **720 seeded `VesselAvailability` rows** (`585` Available, `97` Weather Restricted, `38` Maintenance — matching KJO `Idea_Starters`), and manage **3 live PostgreSQL `SafetyOverride` HSE rules** immediately enforced by `/optimizer/` and `/copilot/`:
+  1. **Sea-State / Weather Hold** on a destination/zone.
+  2. **Vessel Maintenance Hold** (1-click trigger from flagged fuel outliers or availability logs).
   3. **Standby Vessel Protection Lock** (`CB-07` pre-locked; toggleable/manageable in DB).
-- **Standalone & Testable:** Judges inspect flagged fuel outliers, create/toggle an HSE hold saved to PostgreSQL, reload to verify persistence, and confirm `/optimizer/` respects the active safety block.
+- **Standalone & Testable:** Judges inspect fuel anomalies and vessel availability, create/toggle an HSE hold saved to PostgreSQL, reload to verify persistence, and confirm `/optimizer/` immediately respects the active block.
 
-### Feature 4 (Standalone Bonus AI) — AI Dispatch Co-Pilot (`/copilot/`, `core:copilot:index`, Saleh)
-- **Owned Files:** `apps/optimizer/copilot_urls.py`, `apps/optimizer/copilot_views.py`, `templates/optimizer/copilot.html` (implemented by Saleh right after Feature 2 `/optimizer/`).
-- **Behaves Like a Standalone 4th Feature:** Dedicated sidebar entry (`04 · AI`), dedicated Control Tower launch card, and independent `/copilot/` URL with clear **Input → Output** + PostgreSQL persistence.
+### Feature 4 (Standalone Bonus AI) — AI Dispatch Co-Pilot (`/copilot/`, `core:copilot:index` — Next Sprint)
+- **Owned Files:** `apps/optimizer/copilot_urls.py`, `apps/optimizer/copilot_views.py`, `templates/optimizer/copilot.html`.
+- **Behaves Like a Standalone 4th Feature:** Dedicated topbar entry (`04 · AI`), topbar CTA from `/` and `/optimizer/`, and independent `/copilot/` URL with clear **Input → Output** + PostgreSQL persistence.
 - **Inputs:** Supervisor shift directive or KJO scenario + live `pending` queue, active `SafetyOverride` rules, and fuel anomaly alerts from PostgreSQL.
 - **Embedded AI Work & Outputs:** Calls `gemini-4-hydrogen` via the `google-genai` Interactions API using `ActionableDispatchBriefing` structured JSON output (with deterministic fallback if `GEMINI_API_KEY` is missing or times out). Scores each proposed merge (`approve` / `review` / `hold` + risk badge + rationale), enables 1-click HSE hold creation (`SafetyOverride`) and persisted shift handover briefings (`DispatchPlan`) in PostgreSQL.
 
@@ -77,12 +80,10 @@ Portable Django ORM fields only (SQLite + Cloud SQL PostgreSQL parity).
 
 ---
 
-## 6. Parallel Sprint Plan (Post-Schema Freeze)
-- **Now (Parallel):**
-  - **Salman (`feat/trips-*`):** Feature 1 (`/trips/`) + Executive Control Tower (`/`).
-  - **Saleh (`feat/optimizer-*`):** Feature 2 (`/optimizer/`) + Actionable Gemini Co-Pilot (`ActionableDispatchBriefing`).
-- **14:30 – 15:30 (`feat/safety-*`):** First finisher builds Feature 3 (`/safety/`) and verifies `SafetyOverride` integration.
-- **15:30 – 17:00:** Feature freeze at 15:30 -> end-to-end live Cloud Run smoke test (`https://crudeinference.com`) -> finalize `README.md` with exact judge steps & mock-data disclaimer -> submit before 17:00.
+## 6. Current Sprint Status & Parallel Roadmap
+- **Shipped on `main` (Salman):** Core frozen schema & `seed_fleet`, Zero-Scroll Executive Control Tower (`/`), Feature 1 (`/trips/` w/ 2-tab ledger + 3-step booking + centered `#trip-inspector-modal` + `Consolidated` cross-link), and Feature 2 (`/optimizer/` w/ corridor pooling, Milk-Run, HSE Strict Weather, Approve & Revert).
+- **Active Now (Saleh):** Feature 3 (`/safety/`) — physics fuel-burn outliers (`39` high / `8` low / `15` missing), `VesselAvailability` readiness view (`720` rows), and live `SafetyOverride` CRUD integrated with `/optimizer/`.
+- **Next Sprint:** Wire Feature 4 (`/copilot/` via `core:copilot:index`) with live `gemini-4-hydrogen` `ActionableDispatchBriefing` + final end-to-end Cloud Run QA (`https://crudeinference.com`) + hackathon submission before 17:00.
 
 ---
 
