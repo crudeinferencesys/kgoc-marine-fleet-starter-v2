@@ -1,0 +1,281 @@
+<section id="trips-ledger-panel" {% if oob %}hx-swap-oob="outerHTML"{% endif %} class="surface-card overflow-hidden">
+  {% if cancel_notice %}
+  <div class="px-5 py-3 bg-teal-50 border-b border-teal-200 flex items-center justify-between gap-2 htmx-fade-in">
+    <div class="flex items-center gap-2 text-xs font-medium text-teal-900">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-teal-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
+      </svg>
+      <span>{{ cancel_notice }}</span>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Ledger Header & Quick Status Tabs -->
+  <div class="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h2 class="text-base font-semibold text-slate-900">Fleet Trip Ledger</h2>
+      <p class="text-xs text-slate-500">Live pending shift requests ordered first, followed by historical KJO sailings</p>
+    </div>
+
+    <div class="inline-flex flex-wrap items-center gap-1 rounded-lg bg-slate-100 p-1 self-start sm:self-auto">
+      <button
+        type="button"
+        hx-get="{% url 'trips:ledger' %}?status=all&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&q={{ filters.q|urlencode }}"
+        hx-target="#trips-ledger-panel"
+        hx-swap="outerHTML"
+        class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors {% if filters.status == 'all' or not filters.status %}bg-white text-slate-900 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+        All <span class="font-mono tabular-nums text-[11px] text-slate-500 ml-0.5">{{ status_counts.all }}</span>
+      </button>
+      <button
+        type="button"
+        hx-get="{% url 'trips:ledger' %}?status=pending&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&q={{ filters.q|urlencode }}"
+        hx-target="#trips-ledger-panel"
+        hx-swap="outerHTML"
+        class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors {% if filters.status == 'pending' %}bg-white text-amber-800 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+        Pending Queue <span class="font-mono tabular-nums text-[11px] text-amber-700 ml-0.5">{{ status_counts.pending }}</span>
+      </button>
+      <button
+        type="button"
+        hx-get="{% url 'trips:ledger' %}?status=completed&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&q={{ filters.q|urlencode }}"
+        hx-target="#trips-ledger-panel"
+        hx-swap="outerHTML"
+        class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors {% if filters.status == 'completed' %}bg-white text-slate-900 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+        Historical <span class="font-mono tabular-nums text-[11px] text-slate-500 ml-0.5">{{ status_counts.completed }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Live HTMX Filter Bar -->
+  <form
+    hx-get="{% url 'trips:ledger' %}"
+    hx-target="#trips-ledger-panel"
+    hx-swap="outerHTML"
+    hx-trigger="change, submit, keyup changed delay:300ms from:input[name='q']"
+    class="px-5 py-3 bg-slate-50/70 border-b border-slate-100 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-2.5 items-center">
+    <div class="xl:col-span-2">
+      <label for="ledger-filter-status" class="sr-only">Filter by status</label>
+      <select id="ledger-filter-status" name="status" class="select select-bordered select-xs w-full bg-white text-xs">
+        <option value="all" {% if filters.status == 'all' or not filters.status %}selected{% endif %}>All Statuses</option>
+        <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Pending</option>
+        <option value="completed" {% if filters.status == 'completed' %}selected{% endif %}>Completed</option>
+        <option value="consolidated" {% if filters.status == 'consolidated' %}selected{% endif %}>Consolidated</option>
+        <option value="cancelled" {% if filters.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+      </select>
+    </div>
+
+    <div class="xl:col-span-2">
+      <label for="ledger-filter-vessel" class="sr-only">Filter by vessel</label>
+      <select id="ledger-filter-vessel" name="vessel" class="select select-bordered select-xs w-full bg-white text-xs">
+        <option value="">All Vessels</option>
+        {% for v in vessels %}
+        <option value="{{ v.vessel_id }}" {% if filters.vessel == v.vessel_id %}selected{% endif %}>{{ v.vessel_id }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="xl:col-span-3">
+      <label for="ledger-filter-destination" class="sr-only">Filter by destination</label>
+      <select id="ledger-filter-destination" name="destination" class="select select-bordered select-xs w-full bg-white text-xs">
+        <option value="">All Destinations</option>
+        {% for dest in destinations %}
+        <option value="{{ dest }}" {% if filters.destination == dest %}selected{% endif %}>{{ dest }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="xl:col-span-3">
+      <label for="ledger-filter-q" class="sr-only">Search trips</label>
+      <input
+        id="ledger-filter-q"
+        type="text"
+        name="q"
+        value="{{ filters.q }}"
+        placeholder="Search Trip ID, Req ID, notes..."
+        class="input input-bordered input-xs w-full bg-white text-xs" />
+    </div>
+
+    <div class="xl:col-span-2 flex items-center justify-between gap-2">
+      <label for="ledger-filter-half-empty" class="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-slate-700 select-none">
+        <input
+          id="ledger-filter-half-empty"
+          type="checkbox"
+          name="half_empty"
+          value="1"
+          class="checkbox checkbox-warning checkbox-xs"
+          {% if filters.half_empty == '1' %}checked{% endif %} />
+        <span>&lt;50%</span>
+      </label>
+      {% if filters.vessel or filters.destination or filters.half_empty == '1' or filters.q or filters.status and filters.status != 'all' %}
+      <button
+        type="button"
+        hx-get="{% url 'trips:ledger' %}"
+        hx-target="#trips-ledger-panel"
+        hx-swap="outerHTML"
+        class="text-[11px] font-medium text-teal-700 hover:text-teal-900 underline">
+        Reset
+      </button>
+      {% endif %}
+    </div>
+  </form>
+
+  <!-- Responsive Data Table -->
+  <div class="overflow-x-auto">
+    <table class="table table-sm w-full">
+      <thead>
+        <tr class="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider border-b border-slate-200">
+          <th>Trip / Request</th>
+          <th>Vessel &amp; Route</th>
+          <th class="text-right">Capacity Load</th>
+          <th>Conditions</th>
+          <th class="text-right">Status / Action</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100 text-sm">
+        {% for trip in page_obj %}
+        <tr class="hover:bg-slate-50/70 transition-colors">
+          <td class="align-top py-3">
+            <div class="font-mono tabular-nums text-xs font-semibold text-slate-900">{{ trip.trip_id }}</div>
+            {% if trip.request_id %}
+            <div class="font-mono tabular-nums text-[11px] text-slate-500">{{ trip.request_id }}</div>
+            {% endif %}
+            <div class="font-mono tabular-nums text-[11px] text-slate-400 mt-0.5">
+              {{ trip.trip_date|date:"M d" }} · {{ trip.departure_dt|date:"H:i" }}
+            </div>
+          </td>
+
+          <td class="align-top py-3">
+            <div class="flex items-center gap-1.5">
+              <span class="font-mono text-xs font-semibold text-slate-900">{{ trip.vessel.vessel_id }}</span>
+              <span class="text-slate-400">·</span>
+              <span class="text-xs font-medium text-slate-800">{{ trip.origin }} → {{ trip.destination }}</span>
+            </div>
+            <div class="text-[11px] text-slate-500 mt-0.5">
+              {{ trip.mission_type }}
+              {% if trip.notes %}
+              <span class="text-slate-400">·</span>
+              <span class="text-slate-600">{{ trip.notes|truncatechars:42 }}</span>
+              {% endif %}
+            </div>
+          </td>
+
+          <td class="align-top py-3 text-right">
+            <div class="flex items-center justify-end gap-2.5">
+              <div class="w-20 h-1.5 rounded-full bg-slate-100 overflow-hidden shrink-0">
+                <div class="h-full rounded-full {% if trip.utilization_pct < 50 %}bg-amber-500{% elif trip.utilization_pct < 70 %}bg-teal-600{% else %}bg-emerald-600{% endif %}"
+                     style="width: {% if trip.utilization_pct > 100 %}100{% else %}{{ trip.utilization_pct|floatformat:0 }}{% endif %}%"></div>
+              </div>
+              <span class="font-mono tabular-nums text-xs font-semibold {% if trip.utilization_pct < 50 %}text-amber-800{% elif trip.utilization_pct < 70 %}text-teal-800{% else %}text-emerald-800{% endif %} w-10 text-right">
+                {{ trip.utilization_pct|floatformat:0 }}%
+              </span>
+            </div>
+            <div class="font-mono tabular-nums text-[11px] text-slate-500 mt-0.5">
+              {{ trip.passengers }}/{{ trip.vessel.passenger_capacity }} pax · {{ trip.cargo_tonnes|floatformat:1 }}/{{ trip.vessel.cargo_capacity_t|floatformat:1 }} t
+            </div>
+          </td>
+
+          <td class="align-top py-3">
+            <div class="flex flex-wrap items-center gap-1">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium {% if trip.weather == 'Rough' %}bg-rose-50 text-rose-800 border border-rose-200{% elif trip.weather == 'Moderate' %}bg-amber-50 text-amber-900 border border-amber-200{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
+                {{ trip.weather }}
+              </span>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium {% if trip.priority == 'Critical' %}bg-rose-50 text-rose-800 border border-rose-200{% elif trip.priority == 'Urgent' %}bg-amber-50 text-amber-900 border border-amber-200{% else %}bg-slate-100 text-slate-600 border border-slate-200{% endif %}">
+                {{ trip.priority }}
+              </span>
+            </div>
+          </td>
+
+          <td class="align-top py-3 text-right">
+            <div class="flex items-center justify-end gap-1.5">
+              {% if trip.status == 'pending' %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-900 border border-amber-200">
+                Pending
+              </span>
+              <button
+                type="button"
+                class="btn btn-ghost btn-xs text-rose-700 hover:bg-rose-50 border border-rose-200 font-medium"
+                hx-post="{% url 'trips:cancel' trip.trip_id %}"
+                hx-target="#trips-ledger-panel"
+                hx-swap="outerHTML"
+                hx-disabled-elt="this">
+                Cancel
+              </button>
+              {% elif trip.status == 'consolidated' %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+                Consolidated
+              </span>
+              {% elif trip.status == 'cancelled' %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                Cancelled
+              </span>
+              {% else %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-teal-50 text-teal-800 border border-teal-200">
+                Completed
+              </span>
+              {% endif %}
+            </div>
+            {% if trip.status == 'pending' and trip.is_half_empty %}
+            <div class="mt-1">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums font-medium bg-amber-50/80 text-amber-800 border border-amber-200/80">
+                &lt;50% Ready
+              </span>
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="py-10 text-center">
+            <p class="text-sm font-medium text-slate-700">No trips match the current filters.</p>
+            <p class="text-xs text-slate-500 mt-1">Adjust your search criteria or reset filters to view the full fleet ledger.</p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination Footer -->
+  <div class="px-5 py-3 bg-slate-50/70 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-slate-600">
+    <div class="font-mono tabular-nums">
+      {% if total_filtered_count > 0 %}
+      Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ total_filtered_count }} trips
+      {% else %}
+      0 trips matched
+      {% endif %}
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="flex items-center gap-1.5">
+      {% if page_obj.has_previous %}
+      <button
+        type="button"
+        class="btn btn-outline btn-xs border-slate-300 text-slate-700 bg-white hover:bg-slate-100"
+        hx-get="{% url 'trips:ledger' %}?page={{ page_obj.previous_page_number }}&status={{ filters.status|urlencode }}&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&q={{ filters.q|urlencode }}"
+        hx-target="#trips-ledger-panel"
+        hx-swap="outerHTML">
+        Previous
+      </button>
+      {% else %}
+      <button type="button" class="btn btn-outline btn-xs border-slate-200 text-slate-400" disabled>Previous</button>
+      {% endif %}
+
+      <span class="px-2 font-mono tabular-nums text-slate-700">
+        Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+      </span>
+
+      {% if page_obj.has_next %}
+      <button
+        type="button"
+        class="btn btn-outline btn-xs border-slate-300 text-slate-700 bg-white hover:bg-slate-100"
+        hx-get="{% url 'trips:ledger' %}?page={{ page_obj.next_page_number }}&status={{ filters.status|urlencode }}&vessel={{ filters.vessel|urlencode }}&destination={{ filters.destination|urlencode }}&half_empty={{ filters.half_empty|urlencode }}&q={{ filters.q|urlencode }}"
+        hx-target="#trips-ledger-panel"
+        hx-swap="outerHTML">
+        Next
+      </button>
+      {% else %}
+      <button type="button" class="btn btn-outline btn-xs border-slate-200 text-slate-400" disabled>Next</button>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</section>

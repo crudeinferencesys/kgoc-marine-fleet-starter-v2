@@ -303,3 +303,12 @@ class CoreSmokeTests(TestCase):
         brief = ActionableDispatchBriefing.model_validate(payload)
         self.assertEqual(len(brief.merge_assessments), 2)
         self.assertEqual(brief.merge_assessments[1].verdict, "hold")
+
+    def test_control_tower_renders_live_seeded_kpis_without_starter_copy(self):
+        call_command("seed_fleet", if_empty=True, stdout=io.StringIO())
+        response = self.client.get(reverse("core:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Teammate A")
+        self.assertContains(response, "Control Tower")
+        self.assertContains(response, "976")
+        self.assertContains(response, "control-tower-vessel-chart")

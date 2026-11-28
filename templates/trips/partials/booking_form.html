@@ -1,0 +1,306 @@
+<div id="trips-booking-panel" class="space-y-4">
+  {% if created_trip %}
+  <div class="rounded-xl border border-emerald-200 bg-emerald-50/75 p-3.5 space-y-2.5 htmx-fade-in">
+    <div class="flex items-start justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        </span>
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-wider text-emerald-900">Shift Request Queued</div>
+          <div class="font-mono tabular-nums text-xs text-slate-800 font-semibold mt-0.5">
+            {{ created_trip.trip_id }} · {{ created_trip.vessel.vessel_id }} → {{ created_trip.destination }}
+          </div>
+        </div>
+      </div>
+      <span class="font-mono tabular-nums text-xs font-semibold px-2 py-0.5 rounded-full bg-white text-slate-800 border border-emerald-200">
+        {{ created_trip.utilization_pct|floatformat:0 }}% load
+      </span>
+    </div>
+
+    {% if created_trip.is_half_empty %}
+    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-50 text-amber-900 border border-amber-200">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-amber-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+        <path d="M12 9v4" /><path d="M12 17h.01" />
+      </svg>
+      Half-Empty (&lt;50%) — Flagged for Dispatch Optimizer
+    </div>
+    {% endif %}
+
+    {% if created_trip_overrides %}
+    <div class="rounded-lg border border-rose-200 bg-rose-50/90 border-l-4 border-l-rose-600 p-2.5 space-y-1">
+      <div class="text-[11px] font-semibold uppercase tracking-wider text-rose-800">
+        Active HSE Override on {{ created_trip.vessel.vessel_id }}
+      </div>
+      {% for ov in created_trip_overrides %}
+      <p class="text-xs text-rose-900">
+        <span class="font-semibold">{{ ov.get_rule_type_display }}:</span> {{ ov.reason }}
+      </p>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="pt-0.5">
+      <a href="{% url 'optimizer:index' %}" class="inline-flex items-center gap-1 text-xs font-semibold text-teal-800 hover:text-teal-950 underline decoration-teal-500/40">
+        Open Optimizer
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+        </svg>
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+  <form
+    method="post"
+    action="{% url 'trips:create' %}"
+    hx-post="{% url 'trips:create' %}"
+    hx-target="#trips-booking-panel"
+    hx-swap="outerHTML"
+    hx-indicator="#booking-spinner"
+    hx-disabled-elt="button[type='submit']"
+    class="space-y-3.5"
+    x-data="{
+      vesselsMeta: {},
+      vesselId: '',
+      passengers: 0,
+      cargoTonnes: 0,
+      init() {
+        try {
+          const el = document.getElementById('vessels-meta-data');
+          this.vesselsMeta = el ? JSON.parse(el.textContent) : {};
+        } catch (e) {
+          this.vesselsMeta = {};
+        }
+        this.syncFromDom();
+      },
+      syncFromDom() {
+        const vEl = this.$el.querySelector('[name=vessel]');
+        const pEl = this.$el.querySelector('[name=passengers]');
+        const cEl = this.$el.querySelector('[name=cargo_tonnes]');
+        this.vesselId = vEl ? String(vEl.value || '') : '';
+        this.passengers = pEl && pEl.value !== '' ? Number(pEl.value) : 0;
+        this.cargoTonnes = cEl && cEl.value !== '' ? Number(cEl.value) : 0;
+      },
+      get selectedVessel() {
+        return this.vesselId ? (this.vesselsMeta[this.vesselId] || null) : null;
+      },
+      get paxPct() {
+        if (!this.selectedVessel || this.selectedVessel.passenger_capacity <= 0) return 0;
+        return Math.round((this.passengers / this.selectedVessel.passenger_capacity) * 1000) / 10;
+      },
+      get cargoPct() {
+        if (!this.selectedVessel || this.selectedVessel.cargo_capacity_t <= 0) return 0;
+        return Math.round((this.cargoTonnes / this.selectedVessel.cargo_capacity_t) * 1000) / 10;
+      },
+      get maxPct() {
+        return Math.max(this.paxPct, this.cargoPct);
+      },
+      get barWidthPct() {
+        return Math.min(100, Math.max(0, this.maxPct));
+      },
+      get isOverloaded() {
+        if (!this.selectedVessel) return false;
+        return this.passengers > this.selectedVessel.passenger_capacity || this.cargoTonnes > this.selectedVessel.cargo_capacity_t;
+      },
+      get isHalfEmpty() {
+        return !this.isOverloaded && this.maxPct > 0 && this.maxPct < 50;
+      },
+      get barColorClass() {
+        if (this.isOverloaded || this.maxPct > 95) return 'bg-rose-600';
+        if (this.maxPct >= 70) return 'bg-emerald-600';
+        if (this.maxPct >= 50) return 'bg-teal-600';
+        return 'bg-amber-500';
+      },
+      get activeOverrides() {
+        if (!this.selectedVessel || !Array.isArray(this.selectedVessel.active_overrides)) return [];
+        return this.selectedVessel.active_overrides;
+      }
+    }"
+    x-init="init()"
+    @input="syncFromDom()"
+    @change="syncFromDom()">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+    <div class="rounded-xl border border-rose-200 bg-rose-50/90 border-l-4 border-l-rose-600 p-3 space-y-1 htmx-fade-in" role="alert">
+      <div class="text-xs font-semibold uppercase tracking-wider text-rose-800">Booking Validation Error</div>
+      {% for err in form.non_field_errors %}
+      <p class="text-xs text-rose-900 font-medium">{{ err }}</p>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Vessel & Destination -->
+    <div class="space-y-1">
+      <label for="{{ form.vessel.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+        Assigned Vessel
+      </label>
+      {{ form.vessel }}
+      {% if form.vessel.errors %}
+      <p class="text-xs text-rose-700 font-medium">{{ form.vessel.errors|join:", " }}</p>
+      {% endif %}
+    </div>
+
+    <!-- Alpine Live Capacity & HSE Preview -->
+    <div x-show="selectedVessel" x-cloak class="rounded-xl border border-slate-200 bg-slate-50/80 p-3 space-y-2.5">
+      <div class="flex items-center justify-between gap-2">
+        <div>
+          <span class="font-mono font-semibold text-xs text-slate-900" x-text="selectedVessel ? selectedVessel.vessel_id : ''"></span>
+          <span class="text-[11px] text-slate-500 ml-1" x-text="selectedVessel ? ('· ' + selectedVessel.vessel_type) : ''"></span>
+        </div>
+        <span class="font-mono tabular-nums text-xs font-semibold"
+              :class="isOverloaded ? 'text-rose-700' : (isHalfEmpty ? 'text-amber-700' : 'text-teal-700')"
+              x-text="maxPct.toFixed(1) + '%'"></span>
+      </div>
+
+      <div class="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+        <div class="h-full rounded-full transition-all duration-150"
+             :class="barColorClass"
+             :style="'width: ' + barWidthPct + '%'"></div>
+      </div>
+
+      <div class="flex items-center justify-between text-[11px] font-mono tabular-nums text-slate-600">
+        <span x-text="selectedVessel ? (passengers + '/' + selectedVessel.passenger_capacity + ' pax') : ''"></span>
+        <span x-text="selectedVessel ? (cargoTonnes + '/' + selectedVessel.cargo_capacity_t + ' t') : ''"></span>
+      </div>
+
+      <!-- Instant Half-Empty Warning -->
+      <div x-show="isHalfEmpty" x-cloak class="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium text-amber-900 flex items-center gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-amber-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+          <path d="M12 9v4" /><path d="M12 17h.01" />
+        </svg>
+        <span>Half-Empty (&lt;50%) — will be flagged for consolidation</span>
+      </div>
+
+      <!-- Instant Overload Warning -->
+      <div x-show="isOverloaded" x-cloak class="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-800 flex items-center gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-rose-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" />
+        </svg>
+        <span>Exceeds vessel limit — select a larger vessel</span>
+      </div>
+
+      <!-- Instant Active HSE Override Alert -->
+      <div x-show="activeOverrides.length > 0" x-cloak class="rounded-lg border border-rose-200 bg-rose-50/95 border-l-4 border-l-rose-600 p-2.5 space-y-1">
+        <div class="text-[10px] font-semibold uppercase tracking-wider text-rose-800">
+          Active HSE Override
+        </div>
+        <template x-for="(ov, idx) in activeOverrides" :key="idx">
+          <div class="text-[11px] text-rose-900 leading-snug">
+            <span class="font-semibold" x-text="ov.rule_label + ':'"></span>
+            <span x-text="ov.reason"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <div class="space-y-1">
+      <label for="{{ form.destination.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+        Destination
+      </label>
+      {{ form.destination }}
+      {% if form.destination.errors %}
+      <p class="text-xs text-rose-700 font-medium">{{ form.destination.errors|join:", " }}</p>
+      {% endif %}
+    </div>
+
+    <div class="space-y-1">
+      <label for="{{ form.mission_type.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+        Mission Type
+      </label>
+      {{ form.mission_type }}
+      {% if form.mission_type.errors %}
+      <p class="text-xs text-rose-700 font-medium">{{ form.mission_type.errors|join:", " }}</p>
+      {% endif %}
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div class="space-y-1">
+        <label for="{{ form.departure_time.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+          Departure
+        </label>
+        {{ form.departure_time }}
+        {% if form.departure_time.errors %}
+        <p class="text-xs text-rose-700 font-medium">{{ form.departure_time.errors|join:", " }}</p>
+        {% endif %}
+      </div>
+
+      <div class="space-y-1">
+        <label for="{{ form.weather.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+          Sea Weather
+        </label>
+        {{ form.weather }}
+        {% if form.weather.errors %}
+        <p class="text-xs text-rose-700 font-medium">{{ form.weather.errors|join:", " }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div class="space-y-1">
+        <label for="{{ form.passengers.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+          Passengers
+        </label>
+        {{ form.passengers }}
+        {% if form.passengers.errors %}
+        <p class="text-xs text-rose-700 font-medium">{{ form.passengers.errors|join:", " }}</p>
+        {% endif %}
+      </div>
+
+      <div class="space-y-1">
+        <label for="{{ form.cargo_tonnes.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+          Cargo (t)
+        </label>
+        {{ form.cargo_tonnes }}
+        {% if form.cargo_tonnes.errors %}
+        <p class="text-xs text-rose-700 font-medium">{{ form.cargo_tonnes.errors|join:", " }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="space-y-1">
+      <label for="{{ form.priority.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+        Priority
+      </label>
+      {{ form.priority }}
+      {% if form.priority.errors %}
+      <p class="text-xs text-rose-700 font-medium">{{ form.priority.errors|join:", " }}</p>
+      {% endif %}
+    </div>
+
+    <div class="flex items-center gap-2.5 pt-0.5">
+      {{ form.flexible_window }}
+      <label for="{{ form.flexible_window.id_for_label }}" class="text-xs font-medium text-slate-700 cursor-pointer select-none">
+        Flexible departure window (-30m / +60m for optimizer)
+      </label>
+    </div>
+
+    <div class="space-y-1">
+      <label for="{{ form.notes.id_for_label }}" class="block text-xs font-semibold text-slate-700">
+        Operational Notes
+      </label>
+      {{ form.notes }}
+      {% if form.notes.errors %}
+      <p class="text-xs text-rose-700 font-medium">{{ form.notes.errors|join:", " }}</p>
+      {% endif %}
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-sm w-full gap-2">
+      <span class="htmx-hide-on-request inline-flex items-center gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 12h14" /><path d="M12 5v14" />
+        </svg>
+        Log Shift Trip Request
+      </span>
+      <span id="booking-spinner" class="htmx-indicator items-center gap-2">
+        <span class="loading loading-spinner loading-xs"></span>
+        Logging shift request…
+      </span>
+    </button>
+  </form>
+</div>
