@@ -251,6 +251,58 @@ class OptimizerServiceTests(OptimizerFixturesMixin, TestCase):
         self.assertEqual(rough_merge["merge_id"], "TR-ROUGH-1+TR-ROUGH-2")
         self.assertEqual(rough_merge["caution_flag"], "Rough Sea Advisory")
 
+    def test_fleet_wide_weather_hold_blocks_rough_trips_even_when_strict_weather_off(self):
+        vessels = self._create_standard_fleet()
+        self._create_pending_trip(
+            trip_id="TR-QUEUE-07",
+            vessel=vessels["CB-02"],
+            destination="Platform C",
+            dep_time=time(10, 15),
+            early_time=time(10, 0),
+            late_time=time(11, 30),
+            passengers=5,
+            weather="Rough",
+            priority="Urgent",
+        )
+        self._create_pending_trip(
+            trip_id="TR-QUEUE-08",
+            vessel=vessels["CB-03"],
+            destination="Platform C",
+            dep_time=time(10, 45),
+            early_time=time(10, 0),
+            late_time=time(11, 30),
+            passengers=6,
+            weather="Rough",
+            priority="Routine",
+        )
+        fleet_hold = SafetyOverride.objects.create(
+            rule_type="weather_hold",
+            destination="",
+            severity="high",
+            reason="All Rough-Sea Corridors hold from /safety/",
+            is_active=True,
+        )
+
+        blocked_res = run_shift_optimizer(strict_weather=False, allow_milk_run=False)
+        self.assertEqual(blocked_res["proposed_merges"], [])
+        held_by_id = {h["trip"].trip_id: h for h in blocked_res["held_trips"]}
+        self.assertEqual(held_by_id["TR-QUEUE-07"]["category"], "weather_hold")
+        self.assertEqual(held_by_id["TR-QUEUE-07"]["badge_tone"], "rose")
+        self.assertEqual(
+            held_by_id["TR-QUEUE-07"]["reason"],
+            "All Rough-Sea Corridors under active HSE Weather Hold",
+        )
+        self.assertEqual(held_by_id["TR-QUEUE-08"]["category"], "weather_hold")
+        self.assertEqual(held_by_id["TR-QUEUE-08"]["badge_tone"], "rose")
+
+        fleet_hold.is_active = False
+        fleet_hold.save(update_fields=["is_active", "updated_at"])
+
+        restored_res = run_shift_optimizer(strict_weather=False, allow_milk_run=False)
+        self.assertEqual(len(restored_res["proposed_merges"]), 1)
+        self.assertEqual(restored_res["proposed_merges"][0]["merge_id"], "TR-QUEUE-07+TR-QUEUE-08")
+        self.assertEqual(restored_res["proposed_merges"][0]["caution_flag"], "Rough Sea Advisory")
+
     def test_milk_run_merges_platform_cluster_when_enabled(self):
         vessels = self._create_standard_fleet()
         self._create_pending_trip(

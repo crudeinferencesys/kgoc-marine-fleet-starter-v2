@@ -148,6 +148,7 @@ def _classify_pending_trips(
     dest_block_override: dict[str, SafetyOverride],
     *,
     strict_weather: bool,
+    fleet_rough_weather_override: SafetyOverride | None = None,
 ) -> tuple[list[Trip], list[dict]]:
     """Separate pending trips into consolidation-eligible trips and held trips."""
     eligible_trips: list[Trip] = []
@@ -187,6 +188,15 @@ def _classify_pending_trips(
             _add_held(
                 trip,
                 f"{trip.destination} under active HSE Weather Hold",
+                "rose",
+                "weather_hold",
+            )
+            continue
+
+        if fleet_rough_weather_override is not None and trip.weather == "Rough":
+            _add_held(
+                trip,
+                "All Rough-Sea Corridors under active HSE Weather Hold",
                 "rose",
                 "weather_hold",
             )
@@ -341,11 +351,16 @@ def run_shift_optimizer(*, strict_weather: bool = True, allow_milk_run: bool = F
 
     vessel_block_override: dict[int, SafetyOverride] = {}
     dest_block_override: dict[str, SafetyOverride] = {}
+    fleet_rough_weather_override: SafetyOverride | None = None
     for override in active_overrides:
         if override.rule_type in ("standby_lock", "maintenance_hold") and override.vessel_id:
             vessel_block_override.setdefault(override.vessel_id, override)
-        elif override.rule_type == "weather_hold" and override.destination.strip():
-            dest_block_override.setdefault(override.destination.strip(), override)
+        elif override.rule_type == "weather_hold":
+            cleaned_dest = override.destination.strip()
+            if cleaned_dest:
+                dest_block_override.setdefault(cleaned_dest, override)
+            elif fleet_rough_weather_override is None:
+                fleet_rough_weather_override = override
 
     eligible_vessels = [
         v for v in in_service_vessels if v.pk not in vessel_block_override
@@ -356,6 +371,7 @@ def run_shift_optimizer(*, strict_weather: bool = True, allow_milk_run: bool = F
         vessel_block_override,
         dest_block_override,
         strict_weather=strict_weather,
+        fleet_rough_weather_override=fleet_rough_weather_override,
     )
 
     proposed_merges: list[dict] = []
