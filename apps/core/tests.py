@@ -33,15 +33,18 @@ class CoreSmokeTests(TestCase):
         self.assertContains(response, "#0A1628")
         self.assertContains(response, "--p: 56% 0.11 180")
 
-    def test_home_renders_popout_burger_sidebar_drawer(self):
+    def test_home_renders_top_bar_navigation_without_burger_menu(self):
         response = self.client.get(reverse("core:home"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="command-sidebar"')
-        self.assertContains(response, 'aria-controls="command-sidebar"')
-        self.assertContains(response, "sidebarOpen = !sidebarOpen")
-        self.assertContains(response, '@keydown.escape.window="sidebarOpen = false"')
-        self.assertNotContains(response, "lg:pl-64")
-        self.assertNotContains(response, "lg:translate-x-0")
+        self.assertContains(response, 'id="primary-top-nav"')
+        self.assertContains(response, reverse("core:home"))
+        self.assertContains(response, reverse("trips:index"))
+        self.assertContains(response, reverse("optimizer:index"))
+        self.assertContains(response, reverse("safety:index"))
+        self.assertContains(response, reverse("core:copilot:index"))
+        self.assertContains(response, "04 · AI")
+        self.assertNotContains(response, 'id="command-sidebar"')
+        self.assertNotContains(response, "Toggle navigation menu")
 
     def test_home_renders_scroll_awareness_and_calm_validation_shell(self):
         response = self.client.get(reverse("core:home"))

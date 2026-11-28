@@ -140,37 +140,16 @@
 
   {% block extra_head %}{% endblock %}
 </head>
-<body class="min-h-screen bg-[#F6F8FB] text-slate-900 font-sans antialiased"
-      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-      x-data="{ sidebarOpen: false }"
-      @keydown.escape.window="sidebarOpen = false">
+<body class="min-h-screen bg-[#F6F8FB] text-slate-900 font-sans antialiased flex flex-col"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 
-  <!-- Pop-out Sidebar Backdrop -->
-  <div x-show="sidebarOpen"
-       x-cloak
-       x-transition.opacity.duration.200ms
-       @click="sidebarOpen = false"
-       class="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm"
-       aria-hidden="true"></div>
-
-  <!-- Pop-out Deep Navy Command Sidebar Drawer (No Login Wall — Direct Judging Navigation) -->
-  <aside id="command-sidebar"
-         x-show="sidebarOpen"
-         x-cloak
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="-translate-x-full"
-         x-transition:enter-end="translate-x-0"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="translate-x-0"
-         x-transition:leave-end="-translate-x-full"
-         class="fixed inset-y-0 left-0 z-50 w-64 bg-[#0A1628] text-slate-100 border-r border-slate-800/80 shadow-2xl flex flex-col">
-
-    <!-- Brand Identity -->
-    <div class="px-4 h-16 flex items-center justify-between border-b border-white/[0.08]">
-      <a href="{% url 'core:home' %}" class="flex items-center gap-3 group">
-        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500/15 ring-1 ring-teal-400/30 text-teal-300 shrink-0">
-          <!-- Custom Geometric Marine Hull + Radar Sweep SVG -->
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <!-- Deep Maritime Navy Sticky Top Navigation Bar (Zero Burger Menu · Direct Judging Navigation) -->
+  <header id="app-topbar" class="sticky top-0 z-30 h-14 bg-[#0A1628] text-slate-100 border-b border-slate-800/80 px-4 lg:px-6 flex items-center justify-between gap-3 transition-shadow duration-200">
+    <!-- Left: Brand Identity -->
+    <div class="flex items-center gap-3 shrink-0">
+      <a href="{% url 'core:home' %}" class="flex items-center gap-2.5 group">
+        <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500/15 ring-1 ring-teal-400/30 text-teal-300 shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 3v4" />
             <path d="M5 10l7-3 7 3v4l-7 4-7-4v-4z" />
             <path d="M3 19c2 1.2 4 1.2 6 0s4-1.2 6 0 4 1.2 6 0" />
@@ -178,188 +157,96 @@
         </span>
         <div class="leading-tight">
           <div class="text-sm font-bold tracking-tight text-white group-hover:text-teal-200 transition-colors">CrudeInference</div>
-          <div class="text-[11px] font-medium text-slate-400">KGOC Marine Fleet</div>
+          <div class="hidden xl:block text-[10px] font-medium text-slate-400">KGOC Marine Fleet</div>
         </div>
       </a>
-      <button type="button"
-              @click="sidebarOpen = false"
-              class="btn btn-ghost btn-xs text-slate-400 hover:text-white"
-              aria-label="Close navigation menu">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 6 6 18" /><path d="m6 6 12 12" />
-        </svg>
-      </button>
+      <span class="sr-only">{% block topbar_title %}KGOC Marine Fleet · Control Tower{% endblock %}</span>
     </div>
 
-    <!-- Primary Operations Navigation -->
-    <nav class="flex-1 px-3 py-5 space-y-1.5 overflow-y-auto" aria-label="Primary">
-      <div class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-        Operations
-      </div>
-
+    <!-- Center: Direct Horizontal Page Links (All 5 Routes Visible) -->
+    <nav id="primary-top-nav" class="flex items-center gap-1 overflow-x-auto no-scrollbar py-1" aria-label="Primary">
       <a href="{% url 'core:home' %}"
-         class="relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {% if request.path == '/' %}bg-teal-500/15 text-white ring-1 ring-inset ring-teal-400/25{% else %}text-slate-300 hover:text-white hover:bg-white/[0.05]{% endif %}">
-        {% if request.path == '/' %}
-        <span class="absolute left-0 top-2 bottom-2 w-0.5 rounded-r bg-teal-400" aria-hidden="true"></span>
-        {% endif %}
-        <span class="flex items-center gap-2.5">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-[18px] w-[18px] shrink-0 {% if request.path == '/' %}text-teal-300{% else %}text-slate-400{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect width="7" height="9" x="3" y="3" rx="1" /><rect width="7" height="5" x="14" y="3" rx="1" /><rect width="7" height="9" x="14" y="12" rx="1" /><rect width="7" height="5" x="3" y="16" rx="1" />
-          </svg>
-          <span>Control Tower</span>
-        </span>
+         class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors {% if request.path == '/' %}bg-teal-500/20 text-white ring-1 ring-inset ring-teal-400/30{% else %}text-slate-300 hover:text-white hover:bg-white/[0.06]{% endif %}">
+        <span>Control Tower</span>
       </a>
 
       <a href="{% url 'trips:index' %}"
-         class="relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {% if '/trips/' in request.path %}bg-teal-500/15 text-white ring-1 ring-inset ring-teal-400/25{% else %}text-slate-300 hover:text-white hover:bg-white/[0.05]{% endif %}">
-        {% if '/trips/' in request.path %}
-        <span class="absolute left-0 top-2 bottom-2 w-0.5 rounded-r bg-teal-400" aria-hidden="true"></span>
-        {% endif %}
-        <span class="flex items-center gap-2.5">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-[18px] w-[18px] shrink-0 {% if '/trips/' in request.path %}text-teal-300{% else %}text-slate-400{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1 .6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1" />
-            <path d="M19.38 20A11.6 11.6 0 0 0 21 14l-9-4-9 4c0 2.9.94 5.34 2.81 7.76" />
-            <path d="M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6" />
-            <path d="M12 10v4" /><path d="M12 2v3" />
-          </svg>
-          <span>Trips &amp; Utilization</span>
-        </span>
-        <span class="font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded bg-white/[0.07] text-slate-300 whitespace-nowrap shrink-0">01</span>
+         class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors {% if '/trips/' in request.path %}bg-teal-500/20 text-white ring-1 ring-inset ring-teal-400/30{% else %}text-slate-300 hover:text-white hover:bg-white/[0.06]{% endif %}">
+        <span>Trips</span>
+        <span class="font-mono tabular-nums text-[10px] px-1 py-0.5 rounded bg-white/[0.08] text-slate-300">01</span>
       </a>
 
       <a href="{% url 'optimizer:index' %}"
-         class="relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {% if '/optimizer/' in request.path %}bg-teal-500/15 text-white ring-1 ring-inset ring-teal-400/25{% else %}text-slate-300 hover:text-white hover:bg-white/[0.05]{% endif %}">
-        {% if '/optimizer/' in request.path %}
-        <span class="absolute left-0 top-2 bottom-2 w-0.5 rounded-r bg-teal-400" aria-hidden="true"></span>
-        {% endif %}
-        <span class="flex items-center gap-2.5">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-[18px] w-[18px] shrink-0 {% if '/optimizer/' in request.path %}text-teal-300{% else %}text-slate-400{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-            <line x1="12" y1="22.08" x2="12" y2="12" />
-          </svg>
-          <span>Dispatch Optimizer</span>
-        </span>
-        <span class="font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded bg-white/[0.07] text-slate-300 whitespace-nowrap shrink-0">02</span>
+         class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors {% if '/optimizer/' in request.path %}bg-teal-500/20 text-white ring-1 ring-inset ring-teal-400/30{% else %}text-slate-300 hover:text-white hover:bg-white/[0.06]{% endif %}">
+        <span>Optimizer</span>
+        <span class="font-mono tabular-nums text-[10px] px-1 py-0.5 rounded bg-white/[0.08] text-slate-300">02</span>
       </a>
 
       <a href="{% url 'safety:index' %}"
-         class="relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {% if '/safety/' in request.path %}bg-teal-500/15 text-white ring-1 ring-inset ring-teal-400/25{% else %}text-slate-300 hover:text-white hover:bg-white/[0.05]{% endif %}">
-        {% if '/safety/' in request.path %}
-        <span class="absolute left-0 top-2 bottom-2 w-0.5 rounded-r bg-teal-400" aria-hidden="true"></span>
-        {% endif %}
-        <span class="flex items-center gap-2.5">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-[18px] w-[18px] shrink-0 {% if '/safety/' in request.path %}text-teal-300{% else %}text-slate-400{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
-            <path d="M12 8v4" /><path d="M12 16h.01" />
-          </svg>
-          <span>Safety &amp; Fuel Guard</span>
-        </span>
-        <span class="font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded bg-white/[0.07] text-slate-300 whitespace-nowrap shrink-0">03</span>
+         class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors {% if '/safety/' in request.path %}bg-teal-500/20 text-white ring-1 ring-inset ring-teal-400/30{% else %}text-slate-300 hover:text-white hover:bg-white/[0.06]{% endif %}">
+        <span>Safety</span>
+        <span class="font-mono tabular-nums text-[10px] px-1 py-0.5 rounded bg-white/[0.08] text-slate-300">03</span>
       </a>
 
       <a href="{% url 'core:copilot:index' %}"
-         class="relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {% if '/copilot/' in request.path %}bg-indigo-500/20 text-white ring-1 ring-inset ring-indigo-400/35{% else %}text-slate-300 hover:text-white hover:bg-white/[0.05]{% endif %}">
-        {% if '/copilot/' in request.path %}
-        <span class="absolute left-0 top-2 bottom-2 w-0.5 rounded-r bg-indigo-400" aria-hidden="true"></span>
-        {% endif %}
-        <span class="flex items-center gap-2.5">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-[18px] w-[18px] shrink-0 {% if '/copilot/' in request.path %}text-indigo-300{% else %}text-slate-400{% endif %}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
-          </svg>
-          <span>AI Dispatch Co-Pilot</span>
-        </span>
-        <span class="font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/25 text-indigo-200 border border-indigo-400/30 whitespace-nowrap shrink-0">04 · AI</span>
+         class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors {% if '/copilot/' in request.path %}bg-indigo-500/25 text-white ring-1 ring-inset ring-indigo-400/40{% else %}text-slate-300 hover:text-white hover:bg-white/[0.06]{% endif %}">
+        <span>AI Co-Pilot</span>
+        <span class="font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 whitespace-nowrap shrink-0">04 · AI</span>
       </a>
     </nav>
 
-    <!-- Pinned Bottom System Telemetry Card -->
-    <div class="p-3 border-t border-white/[0.08]">
-      <div class="bg-white/[0.04] border border-white/[0.08] rounded-xl p-3 space-y-1.5">
-        <div class="flex items-center justify-between gap-2">
-          <span class="inline-flex items-center gap-2 text-xs font-medium text-slate-200">
-            <span class="relative flex h-2 w-2" aria-hidden="true">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-            </span>
-            System Live
-          </span>
-          <a href="{% url 'core:health' %}"
-             class="font-mono text-[11px] text-teal-300 hover:text-teal-200 underline decoration-teal-500/40"
-             target="_blank"
-             rel="noopener">
-            /health/
-          </a>
-        </div>
-        <p class="text-[11px] text-slate-400">Theme 4 · Public Judging Mode</p>
+    <!-- Right: Scroll Context, Health Telemetry & Page Action Slot -->
+    <div class="flex items-center gap-2 shrink-0">
+      <div id="topbar-scroll-context"
+           class="hidden items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-white/[0.08] text-slate-200 border border-white/15 max-w-[200px]"
+           aria-live="off">
+        <span class="h-1.5 w-1.5 rounded-full bg-teal-400 shrink-0" aria-hidden="true"></span>
+        <span id="topbar-scroll-section" class="truncate">Overview</span>
+        <span class="text-slate-500" aria-hidden="true">·</span>
+        <span id="topbar-scroll-pct" class="font-mono tabular-nums text-teal-300 shrink-0">0%</span>
       </div>
-    </div>
-  </aside>
-
-  <!-- Main Workspace -->
-  <div class="min-h-screen flex flex-col">
-
-    <!-- Sticky Frosted Topbar -->
-    <header id="app-topbar" class="sticky top-0 z-30 h-14 bg-white/85 backdrop-blur-md border-b border-slate-200/80 px-4 lg:px-8 flex items-center justify-between gap-4 transition-shadow duration-200">
-      <div class="flex items-center gap-3 min-w-0">
-        <button type="button"
-                @click="sidebarOpen = !sidebarOpen"
-                :aria-expanded="sidebarOpen.toString()"
-                aria-controls="command-sidebar"
-                class="btn btn-ghost btn-sm btn-square text-slate-700 hover:bg-slate-100"
-                aria-label="Toggle navigation menu">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-        <div class="flex items-center gap-2.5 min-w-0">
-          <span class="text-sm font-semibold text-slate-900 truncate">
-            {% block topbar_title %}KGOC Marine Fleet · Control Tower{% endblock %}
-          </span>
-          <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-teal-50 text-teal-800 border border-teal-200 shrink-0">
-            Offshore Ops · KJO
-          </span>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-2 shrink-0">
-        <div id="topbar-scroll-context"
-             class="hidden items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100/90 text-slate-600 border border-slate-200/80 max-w-[220px]"
-             aria-live="off">
-          <span class="h-1.5 w-1.5 rounded-full bg-teal-500 shrink-0" aria-hidden="true"></span>
-          <span id="topbar-scroll-section" class="truncate">Overview</span>
-          <span class="text-slate-300" aria-hidden="true">·</span>
-          <span id="topbar-scroll-pct" class="font-mono tabular-nums text-teal-700 shrink-0">0%</span>
-        </div>
-        <button id="back-to-top-btn"
-                type="button"
-                class="hidden btn btn-ghost btn-xs text-slate-600 hover:text-slate-900 gap-1"
-                aria-label="Back to top">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="m18 15-6-6-6 6" />
-          </svg>
-          <span class="hidden sm:inline">Top</span>
-        </button>
+      <button id="back-to-top-btn"
+              type="button"
+              class="hidden btn btn-ghost btn-xs text-slate-300 hover:text-white hover:bg-white/10 gap-1"
+              aria-label="Back to top">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m18 15-6-6-6 6" />
+        </svg>
+        <span class="hidden sm:inline">Top</span>
+      </button>
+      <div class="hidden xl:flex items-center gap-1.5 [&_a.btn-outline]:text-slate-200 [&_a.btn-outline]:border-slate-600 [&_a.btn-outline]:hover:bg-white/10">
         {% block topbar_actions %}{% endblock %}
-        <span class="hidden md:inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200/80">
-          Mock Data
-        </span>
       </div>
-      <div id="scroll-progress-bar"
-           class="scroll-progress-bar absolute inset-x-0 bottom-0 h-[2.5px] bg-gradient-to-r from-teal-500 via-teal-600 to-emerald-500 pointer-events-none"
-           aria-hidden="true"></div>
-    </header>
+      <a href="{% url 'core:health' %}"
+         class="hidden sm:inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/[0.06] border border-white/10 font-mono text-[11px] text-teal-300 hover:text-teal-200"
+         target="_blank"
+         rel="noopener"
+         title="System Live · Theme 4 Public Judging Mode">
+        <span class="relative flex h-2 w-2" aria-hidden="true">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+        </span>
+        /health/
+      </a>
+      <span class="hidden 2xl:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/[0.06] text-slate-300 border border-white/10">
+        Mock Data
+      </span>
+    </div>
 
-    <!-- Main Content -->
-    <main class="flex-1 w-full max-w-7xl mx-auto px-4 lg:px-8 py-6">
-      {% block content %}{% endblock %}
-    </main>
+    <div id="scroll-progress-bar"
+         class="scroll-progress-bar absolute inset-x-0 bottom-0 h-[2.5px] bg-gradient-to-r from-teal-400 via-teal-500 to-emerald-400 pointer-events-none"
+         aria-hidden="true"></div>
+  </header>
 
-    <!-- Judging Transparency Footer -->
-    <footer class="bg-white/80 border-t border-slate-200/80 text-slate-500 px-4 lg:px-8 py-3.5 text-xs text-center">
-      KGOC AI Hackathon · Theme 4: Marine Fleet Utilization &amp; Optimization · Public judging access (no login required) · Mock/synthetic operational data only.
-    </footer>
-  </div>
+  <!-- Main Content -->
+  <main class="flex-1 w-full max-w-7xl mx-auto px-4 lg:px-8 py-4">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Judging Transparency Footer -->
+  <footer class="bg-white/80 border-t border-slate-200/80 text-slate-500 px-4 lg:px-8 py-2.5 text-xs text-center">
+    KGOC AI Hackathon · Theme 4: Marine Fleet Utilization &amp; Optimization · Public judging access (no login required) · Mock/synthetic operational data only.
+  </footer>
 
   <script>
     (() => {
@@ -386,9 +273,7 @@
 
         if (topbar) {
           const elevated = y > 12;
-          topbar.classList.toggle("shadow-sm", elevated);
-          topbar.classList.toggle("bg-white/95", elevated);
-          topbar.classList.toggle("bg-white/85", !elevated);
+          topbar.classList.toggle("shadow-md", elevated);
         }
 
         if (progressBar && !supportsScrollTimeline && !reducedMotion) {
