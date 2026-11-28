@@ -8,6 +8,8 @@ urlpatterns = [
     path("", views.index, name="index"),
     path("create/", views.create_trip, name="create"),
     path("ledger/", views.ledger_partial, name="ledger"),
+    path("export/", views.export_trips_csv, name="export_csv"),
+    path("<str:trip_id>/inspect/", views.trip_inspector, name="inspect"),
     path("<str:trip_id>/cancel/", views.cancel_trip, name="cancel"),
     path("ping/", views.ping, name="ping"),
 ]

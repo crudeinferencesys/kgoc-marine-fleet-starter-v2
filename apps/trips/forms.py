@@ -15,8 +15,8 @@ from apps.trips.services import DESTINATION_DISTANCES_NM, generate_live_trip_ids
 KUWAIT_TZ = ZoneInfo("Asia/Kuwait")
 SHIFT_QUEUE_DATE = date(2026, 11, 28)
 
-_SELECT_CLS = "select select-bordered select-sm w-full bg-white text-slate-900"
-_INPUT_CLS = "input input-bordered input-sm w-full bg-white text-slate-900 font-mono tabular-nums"
+_SELECT_CLS = "select select-bordered select-sm w-full bg-white text-slate-900 field-control"
+_INPUT_CLS = "input input-bordered input-sm w-full bg-white text-slate-900 font-mono tabular-nums field-control"
 
 
 class TripBookingForm(forms.Form):
@@ -70,7 +70,7 @@ class TripBookingForm(forms.Form):
         widget=forms.TextInput(
             attrs={
                 "placeholder": "Optional shift transfer or deck manifest note",
-                "class": "input input-bordered input-sm w-full bg-white text-slate-900",
+                "class": "input input-bordered input-sm w-full bg-white text-slate-900 field-control",
             }
         ),
     )

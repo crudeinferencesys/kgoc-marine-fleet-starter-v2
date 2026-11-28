@@ -265,3 +265,79 @@ class TripsViewIntegrationTests(TestCase):
             reverse("trips:cancel", kwargs={"trip_id": completed_trip.trip_id})
         )
         self.assertEqual(completed_response.status_code, 400)
+
+    def test_dim_preset_filters_anomaly_and_weather(self):
+        high_result = filter_trips({"status": "all", "anomaly": "high"})
+        self.assertGreater(high_result["total_filtered_count"], 0)
+        self.assertEqual(
+            high_result["preset_counts"]["outliers"],
+            high_result["total_filtered_count"],
+        )
+        self.assertTrue(
+            all(t.fuel_anomaly_status == "high" for t in high_result["page_obj"])
+        )
+
+        missing_result = filter_trips({"status": "all", "anomaly": "missing"})
+        self.assertGreater(missing_result["total_filtered_count"], 0)
+        self.assertTrue(
+            all(t.fuel_anomaly_status == "missing" for t in missing_result["page_obj"])
+        )
+
+        rough_result = filter_trips({"status": "all", "weather": "Rough"})
+        self.assertGreater(rough_result["total_filtered_count"], 0)
+        self.assertTrue(all(t.weather == "Rough" for t in rough_result["page_obj"]))
+
+    def test_trip_inspector_returns_telemetry_siblings_and_404(self):
+        # CB-07 pending trip should show standby lock HSE override and physics telemetry
+        cb07_trip = Trip.objects.filter(vessel__vessel_id="CB-07", status="pending").first()
+        self.assertIsNotNone(cb07_trip)
+
+        response = self.client.get(
+            reverse("trips:inspect", kwargs={"trip_id": cb07_trip.trip_id})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, cb07_trip.trip_id)
+        self.assertContains(response, "Physics-Based Fuel Audit")
+        self.assertContains(response, "Standby Vessel Protection Lock")
+        self.assertContains(response, "Same-Day Corridor Siblings")
+
+        missing_response = self.client.get(
+            reverse("trips:inspect", kwargs={"trip_id": "TR-DOES-NOT-EXIST"})
+        )
+        self.assertEqual(missing_response.status_code, 404)
+
+    def test_index_renders_progressive_form_presets_and_inspector_drawer(self):
+        response = self.client.get(reverse("trips:index"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Skip optional &amp; submit with defaults")
+        self.assertContains(response, 'id="optional-trip-details"')
+        self.assertContains(response, "field-control")
+        self.assertContains(response, "Fuel Outliers")
+        self.assertContains(response, "Missing Logs")
+        self.assertContains(response, "Rough Weather")
+        self.assertContains(response, 'id="trip-inspector-drawer"')
+        self.assertContains(response, 'id="booking-drawer"')
+        self.assertContains(response, "Advanced Filters")
+        self.assertContains(response, "Export CSV")
+        self.assertContains(response, "Trip Ledger")
+        self.assertContains(response, "Fleet Analytics")
+
+    def test_zero_scroll_pagination_and_filtered_csv_export(self):
+        default_page = self.client.get(reverse("trips:index"))
+        self.assertEqual(default_page.status_code, 200)
+        self.assertEqual(len(default_page.context["page_obj"]), 8)
+
+        page_15 = self.client.get(reverse("trips:ledger"), data={"per_page": "15"})
+        self.assertEqual(page_15.status_code, 200)
+        self.assertEqual(len(page_15.context["page_obj"]), 15)
+
+        csv_response = self.client.get(
+            reverse("trips:export_csv"),
+            data={"status": "pending", "destination": "Platform A"},
+        )
+        self.assertEqual(csv_response.status_code, 200)
+        self.assertIn("text/csv", csv_response["Content-Type"])
+        self.assertIn("kgoc_fleet_trips.csv", csv_response["Content-Disposition"])
+        body = csv_response.content.decode("utf-8")
+        self.assertIn("TR-QUEUE-01", body)
+        self.assertNotIn("TR-QUEUE-05", body)
