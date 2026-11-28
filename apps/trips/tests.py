@@ -309,6 +309,12 @@ class TripsViewIntegrationTests(TestCase):
     def test_index_renders_progressive_form_presets_and_inspector_drawer(self):
         response = self.client.get(reverse("trips:index"))
         self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'id="booking-drawer"')
+        self.assertContains(response, 'id="trip-booking-workflow"')
+        self.assertContains(response, "Log New Trip")
+        self.assertContains(response, "Route &amp; Mission")
+        self.assertContains(response, "Vessel &amp; Payload")
+        self.assertContains(response, "Optional Details")
         self.assertContains(response, "Skip optional &amp; submit with defaults")
         self.assertContains(response, 'id="optional-trip-details"')
         self.assertContains(response, "field-control")
@@ -316,7 +322,6 @@ class TripsViewIntegrationTests(TestCase):
         self.assertContains(response, "Missing Logs")
         self.assertContains(response, "Rough Weather")
         self.assertContains(response, 'id="trip-inspector-drawer"')
-        self.assertContains(response, 'id="booking-drawer"')
         self.assertContains(response, "More Filters")
         self.assertContains(response, 'id="trips-more-filters-modal"')
         self.assertContains(response, "Route &amp; Area")
@@ -325,6 +330,16 @@ class TripsViewIntegrationTests(TestCase):
         self.assertContains(response, "Export CSV")
         self.assertContains(response, "Trip Ledger")
         self.assertContains(response, "Fleet Analytics")
+
+    def test_booking_workflow_query_param_and_destination_distances(self):
+        response = self.client.get(reverse("trips:index"), data={"book": "1"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="trip-booking-workflow"')
+        self.assertContains(response, "36 nm")
+        self.assertContains(response, "43 nm")
+        self.assertContains(response, "CB-01")
+        self.assertContains(response, "CB-07")
+        self.assertContains(response, "Standby")
 
     def test_categorized_more_filters_and_csv_export(self):
         # Route & Area filters
