@@ -19,6 +19,9 @@ class CoreSmokeTests(TestCase):
         self.assertContains(response, "X-CSRFToken")
         self.assertContains(response, "KGOC Marine Fleet")
         self.assertContains(response, reverse("core:health"))
+        self.assertContains(response, "JetBrains Mono")
+        self.assertContains(response, "#0B192C")
+        self.assertContains(response, "--p: 51% 0.095 182")
 
     @override_settings(GEMINI_MODEL="gemini-4-hydrogen")
     def test_health_and_healthz_report_ok_database_and_model(self):
