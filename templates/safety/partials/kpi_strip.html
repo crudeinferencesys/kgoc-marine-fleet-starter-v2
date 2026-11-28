@@ -1,0 +1,81 @@
+<div id="safety-kpi-strip" {% if oob %}hx-swap-oob="outerHTML"{% endif %} class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+  <!-- KPI 1: High-Burn Outliers -->
+  <div class="surface-card kpi-accent-rose p-3">
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">High-Burn Outliers</span>
+      <span class="flex h-6 w-6 items-center justify-center rounded-md bg-rose-50 text-rose-700 shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+        </svg>
+      </span>
+    </div>
+    <div class="mt-1 flex items-baseline gap-1.5">
+      <span class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-rose-700">{{ kpis.high_outliers_count }}</span>
+      <span class="text-xs font-semibold text-slate-500">runs</span>
+    </div>
+    <p class="mt-0.5 text-[11px] text-slate-500 font-mono tabular-nums truncate">
+      {{ kpis.calm_moderate_high_count }} non-rough · max {{ kpis.max_fuel_ratio|floatformat:2 }}×
+    </p>
+  </div>
+
+  <!-- KPI 2: Est. Excess Fuel Cost (Pillar 4 Quantified Impact) -->
+  <div class="surface-card kpi-accent-emerald p-3">
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Est. Excess Fuel Cost</span>
+      <span class="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-50 text-emerald-700 shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+        </svg>
+      </span>
+    </div>
+    <div class="mt-1 flex items-baseline gap-1.5">
+      <span class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-emerald-700">{{ kpis.excess_fuel_kwd|floatformat:"0g" }}</span>
+      <span class="text-xs font-semibold text-slate-500">KWD</span>
+    </div>
+    <p class="mt-0.5 text-[11px] text-slate-500 font-mono tabular-nums truncate">
+      {{ kpis.excess_fuel_l|floatformat:"0g" }} L · {{ kpis.excess_co2_tonnes|floatformat:1 }} t CO₂
+    </p>
+  </div>
+
+  <!-- KPI 3: Missing Fuel Logs -->
+  <div class="surface-card kpi-accent-amber p-3">
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Missing Fuel Logs</span>
+      <span class="flex h-6 w-6 items-center justify-center rounded-md bg-amber-50 text-amber-700 shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="12" x2="12" y1="12" y2="16" />
+          <line x1="12" x2="12.01" y1="19" y2="19" />
+        </svg>
+      </span>
+    </div>
+    <div class="mt-1 flex items-baseline gap-1.5">
+      <span class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-amber-700">{{ kpis.missing_logs_count }}</span>
+      <span class="text-xs font-semibold text-slate-500">logs</span>
+    </div>
+    <p class="mt-0.5 text-[11px] text-slate-500 font-mono tabular-nums truncate">
+      {{ kpis.low_readings_count }} low ≤0.7×
+    </p>
+  </div>
+
+  <!-- KPI 4: Active HSE Holds -->
+  <div class="surface-card kpi-accent-teal p-3">
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Active HSE Holds</span>
+      <span class="flex h-6 w-6 items-center justify-center rounded-md bg-teal-50 text-teal-700 shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          <path d="m9 12 2 2 4-4" />
+        </svg>
+      </span>
+    </div>
+    <div class="mt-1 flex items-baseline gap-1.5">
+      <span class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-teal-700">{{ kpis.active_holds_count }}</span>
+      <span class="text-xs font-semibold text-slate-500">active</span>
+    </div>
+    <p class="mt-0.5 text-[11px] text-slate-500 font-mono tabular-nums truncate">
+      {{ kpis.affected_pending_trips_count }} pending blocked
+    </p>
+  </div>
+</div>
