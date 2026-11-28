@@ -28,8 +28,8 @@ Two AI agents are editing this repository in parallel, and merging to `main` **a
    - Start every task from an up-to-date `main`: `git fetch origin && git checkout -b feat/<slice>-<task> origin/main`.
 3. **Respect Slice Ownership (Prevent Merge Conflicts):**
    - **Salman (Teammate A) owns:** Control Tower (`/`), Feature 1 (`apps/trips/**`, `templates/trips/**` — **Shipped**), and Feature 2 (`apps/optimizer/services.py`, `views.py`, `urls.py`, `tests.py`, `templates/optimizer/index.html`, `partials/workspace.html` — **Shipped**).
-   - **Saleh (Teammate B) owns:** Feature 3 (`apps/safety/**`, `templates/safety/**` — **Active**; surface physics fuel anomalies, live `SafetyOverride` CRUD, and the 720 seeded `VesselAvailability` rows).
-   - **Feature 4 (Bonus AI `/copilot/`):** `apps/optimizer/copilot_urls.py`, `apps/optimizer/copilot_views.py`, `templates/optimizer/copilot.html` (**Next sprint** — coordinate verbally before editing).
+   - **Saleh (Teammate B) owns:** Feature 3 (`apps/safety/**`, `templates/safety/**` — **Shipped**, PR #22/#23 on `main`; physics fuel anomalies, live `SafetyOverride` CRUD, and 720 seeded `VesselAvailability` rows).
+   - **Feature 4 (Bonus AI `/copilot/` — Shipped, PR #25 on `main`):** `apps/optimizer/copilot_urls.py`, `apps/optimizer/copilot_views.py`, `apps/optimizer/copilot_services.py`, `apps/optimizer/copilot_tests.py`, `templates/optimizer/copilot.html`, `templates/optimizer/partials/copilot_workspace.html`.
    - **Coordinate verbally before touching:** `apps/core/**`, `docs/designs/**`.
 4. **FROZEN SHARED FILES (DO NOT MODIFY WITHOUT EXPLICIT HUMAN APPROVAL IN CHAT):**
    - `apps/core/models.py` (shared schema & migrations — freezing prevents `0002` migration graph collisions!)
