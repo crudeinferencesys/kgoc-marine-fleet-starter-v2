@@ -2,7 +2,6 @@
      class="htmx-fade-in"
      x-data="{
        activeTab: '{{ active_tab|default:"review"|escapejs }}',
-       rightTab: '{{ active_subtab|default:"verdicts"|escapejs }}',
        scenarioKey: '{{ scenario_key|escapejs }}',
        directive: '{{ directive|escapejs }}',
        strictWeather: {{ strict_weather|yesno:'true,false' }},
@@ -21,13 +20,14 @@
            this.scenariosMap = {};
          }
        },
-       selectScenario(key) {
+       selectAndRun(key) {
          const preset = this.scenariosMap[key];
          if (!preset) return;
          this.scenarioKey = preset.key;
          this.strictWeather = Boolean(preset.strict_weather);
          this.allowMilkRun = Boolean(preset.allow_milk_run);
          this.directive = preset.directive || '';
+         this.submitReview();
        },
        submitReview() {
          const form = this.$root.querySelector('#copilot-review-form');
@@ -42,10 +42,6 @@
            }
          });
        },
-       usePresetAndReview() {
-         this.directive = '';
-         this.submitReview();
-       },
        copyBrief() {
          const el = this.$root.querySelector('#copilot-brief-copy-source');
          const text = el ? el.textContent.trim() : '';
@@ -59,25 +55,29 @@
      }">
   {{ scenarios|json_script:"copilot-scenarios-data" }}
 
-  <!-- Band 1: Slim Operational Toolbar -->
-  <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 mb-2.5">
+  <!-- Band 1: Slim Executive Header + 2-Tab Switcher -->
+  <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
     <div class="flex flex-wrap items-center gap-2">
       <h1 class="text-xl font-bold tracking-tight text-slate-900">AI Dispatch Co-Pilot</h1>
       {% if ai_live_used %}
-      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-600 text-white">
+      <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-600 text-white">
         <span class="h-1.5 w-1.5 rounded-full bg-indigo-200" aria-hidden="true"></span>
         Live AI Analysis
       </span>
-      {% else %}
-      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
+      {% elif ai_review_requested or not ai_configured %}
+      <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
         <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
         Deterministic Fallback
+      </span>
+      {% else %}
+      <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200">
+        <span class="h-1.5 w-1.5 rounded-full bg-indigo-600" aria-hidden="true"></span>
+        Gemini 4 Ready
       </span>
       {% endif %}
     </div>
 
-    <!-- 2-Tab Workspace Switcher -->
-    <div class="inline-flex items-center rounded-lg bg-slate-200/70 p-1 self-start lg:self-auto"
+    <div class="inline-flex items-center rounded-lg bg-slate-200/70 p-1"
          role="tablist"
          aria-label="AI Dispatch Co-Pilot views">
       <button type="button"
@@ -86,7 +86,7 @@
               @click="activeTab = 'review'"
               :class="activeTab === 'review' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
               class="px-3 py-1 rounded-md text-xs font-semibold transition-all whitespace-nowrap">
-        AI Risk Review
+        Executive Brief
       </button>
       <button type="button"
               role="tab"
@@ -98,65 +98,10 @@
         <span class="font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 leading-none">{{ saved_briefings_count }}</span>
       </button>
     </div>
-
-    <!-- Compact Policy Toggles + Primary Indigo Review CTA -->
-    <form id="copilot-review-form"
-          method="post"
-          action="{% url 'core:copilot:review' %}"
-          hx-post="{% url 'core:copilot:review' %}"
-          hx-target="#copilot-workspace"
-          hx-swap="outerHTML"
-          hx-indicator="#copilot-spinner"
-          hx-disabled-elt="#run-copilot-review-btn"
-          class="flex flex-wrap items-center gap-1.5 shrink-0">
-      {% csrf_token %}
-      <input type="hidden" name="scenario_key" :value="scenarioKey" />
-      <input type="hidden" name="directive" :value="directive" />
-      <input type="hidden" name="strict_weather" value="0" />
-      <label for="copilot-strict-weather"
-             class="inline-flex items-center gap-1.5 cursor-pointer select-none px-2 py-1 rounded-lg bg-white border border-slate-200 text-xs font-medium text-slate-700 hover:border-slate-300">
-        <input id="copilot-strict-weather"
-               type="checkbox"
-               name="strict_weather"
-               value="1"
-               x-model="strictWeather"
-               {% if strict_weather %}checked{% endif %}
-               class="toggle toggle-xs toggle-primary" />
-        <span>HSE Strict Weather</span>
-      </label>
-
-      <input type="hidden" name="allow_milk_run" value="0" />
-      <label for="copilot-allow-milk-run"
-             class="inline-flex items-center gap-1.5 cursor-pointer select-none px-2 py-1 rounded-lg bg-white border border-slate-200 text-xs font-medium text-slate-700 hover:border-slate-300">
-        <input id="copilot-allow-milk-run"
-               type="checkbox"
-               name="allow_milk_run"
-               value="1"
-               x-model="allowMilkRun"
-               {% if allow_milk_run %}checked{% endif %}
-               class="toggle toggle-xs toggle-primary" />
-        <span>Milk-Run</span>
-      </label>
-
-      <button id="run-copilot-review-btn"
-              type="submit"
-              class="btn btn-xs bg-indigo-600 hover:bg-indigo-700 text-white border-0 gap-1.5 font-semibold">
-        <span class="htmx-hide-on-request inline-flex items-center gap-1.5">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3z" />
-          </svg>
-          <span>Run AI Risk Review</span>
-        </span>
-        <span id="copilot-spinner" class="htmx-indicator items-center gap-1.5">
-          <span class="loading loading-spinner loading-xs"></span>
-          <span>Analyzing…</span>
-        </span>
-      </button>
-    </form>
   </div>
 
   {% if notice %}
-  <div class="mb-2 px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center justify-between gap-2
+  <div class="mb-2.5 px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center justify-between gap-2
     {% if notice_tone == 'indigo' %}bg-indigo-50 border-indigo-200 text-indigo-950
     {% elif notice_tone == 'emerald' %}bg-emerald-50 border-emerald-200 text-emerald-900
     {% else %}bg-amber-50 border-amber-200 text-amber-900{% endif %}"
@@ -171,514 +116,303 @@
     <button type="button"
             @click="activeTab = activeTab === 'review' ? 'briefings' : 'review'"
             class="text-[11px] font-semibold underline shrink-0">
-      <span x-text="activeTab === 'review' ? 'View Saved Briefings' : 'Back to Risk Review'">View Saved Briefings</span>
+      <span x-text="activeTab === 'review' ? 'View Saved Briefings' : 'Back to Executive Brief'">View Saved Briefings</span>
     </button>
   </div>
   {% endif %}
 
-  <!-- Band 2: Compact 4-Card KPI Strip (Hidden on Saved Briefings Tab) -->
-  <div x-show="activeTab === 'review'"
-       {% if active_tab != 'review' %}style="display: none;"{% endif %}
-       class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-2.5"
-       data-scroll-section
-       data-scroll-label="Co-Pilot KPIs">
-    <!-- KPI 1: AI Cleared Merges -->
-    <div class="surface-card kpi-accent-indigo p-3">
-      <div class="flex items-center justify-between gap-2">
-        <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">AI Cleared Merges</span>
-        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-50 text-indigo-700 shrink-0">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3z" />
-          </svg>
-        </span>
+  <!-- Band 2: Unified Quick Briefs + Custom Prompt Bar -->
+  <section x-show="activeTab === 'review'"
+           {% if active_tab != 'review' %}style="display: none;"{% endif %}
+           data-scroll-section
+           data-scroll-label="Quick Briefs &amp; Prompt"
+           class="surface-card p-3 mb-3">
+    <form id="copilot-review-form"
+          method="post"
+          action="{% url 'core:copilot:review' %}"
+          hx-post="{% url 'core:copilot:review' %}"
+          hx-target="#copilot-workspace"
+          hx-swap="outerHTML"
+          hx-indicator="#copilot-spinner"
+          hx-disabled-elt="#run-copilot-review-btn, .copilot-preset-chip">
+      {% csrf_token %}
+      <input type="hidden" name="scenario_key" :value="scenarioKey" />
+      <input type="hidden" name="strict_weather" :value="strictWeather ? '1' : '0'" />
+      <input type="hidden" name="allow_milk_run" :value="allowMilkRun ? '1' : '0'" />
+
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mr-1 shrink-0">Quick Briefs</span>
+        {% for sc in scenarios %}
+        <button type="button"
+                @click="selectAndRun('{{ sc.key|escapejs }}')"
+                :class="scenarioKey === '{{ sc.key|escapejs }}' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/60'"
+                class="copilot-preset-chip inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold transition-all">
+          <span>{{ sc.title }}</span>
+        </button>
+        {% endfor %}
       </div>
-      <div class="mt-1 flex items-baseline gap-1.5">
-        <span class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-emerald-700">{{ approve_count }}</span>
-        <span class="text-xs font-semibold text-slate-500">approved</span>
-        <span class="ml-auto text-[11px] font-mono tabular-nums text-slate-500">
-          <span class="text-amber-700 font-semibold">{{ review_count }}</span> rev · <span class="text-rose-700 font-semibold">{{ hold_count }}</span> hold
-        </span>
-      </div>
-    </div>
 
-    <!-- KPI 2: Est. Savings (KWD · mock + L) -->
-    <div class="surface-card kpi-accent-emerald p-3">
-      <div class="flex items-center justify-between gap-2">
-        <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Est. Savings</span>
-        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-50 text-emerald-700 shrink-0">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-          </svg>
-        </span>
-      </div>
-      <div class="mt-1 flex items-baseline gap-1.5">
-        <span class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-emerald-700">
-          {% if approve_count > 0 %}{{ cleared_summary.kwd_saved|floatformat:"0g" }}{% else %}{{ summary.kwd_saved|floatformat:"0g" }}{% endif %}
-        </span>
-        <span class="text-xs font-semibold text-slate-500">KWD</span>
-        <span class="text-[10px] text-slate-400">· mock</span>
-        <span class="ml-auto text-[11px] font-mono tabular-nums text-slate-500">
-          {% if approve_count > 0 %}{{ cleared_summary.fuel_liters_saved|floatformat:"0g" }}{% else %}{{ summary.fuel_liters_saved|floatformat:"0g" }}{% endif %} L
-        </span>
-      </div>
-    </div>
-
-    <!-- KPI 3: CO2 & Time Saved -->
-    <div class="surface-card kpi-accent-teal p-3">
-      <div class="flex items-center justify-between gap-2">
-        <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">CO₂ &amp; Time Saved</span>
-        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-teal-50 text-teal-700 shrink-0">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-          </svg>
-        </span>
-      </div>
-      <div class="mt-1 flex items-baseline gap-1.5">
-        <span class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-slate-900">
-          {% if approve_count > 0 %}{{ cleared_summary.co2_kg_saved|floatformat:"0g" }}{% else %}{{ summary.co2_kg_saved|floatformat:"0g" }}{% endif %}
-        </span>
-        <span class="text-xs font-semibold text-slate-500">kg CO₂</span>
-        <span class="ml-auto text-[11px] font-mono tabular-nums text-slate-500">
-          {% if approve_count > 0 %}{{ cleared_summary.dispatcher_minutes_saved }}{% else %}{{ summary.dispatcher_minutes_saved }}{% endif %} mins
-        </span>
-      </div>
-    </div>
-
-    <!-- KPI 4: Active HSE Guardrails -->
-    <div class="surface-card kpi-accent-rose p-3">
-      <div class="flex items-center justify-between gap-2">
-        <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Active HSE Guardrails</span>
-        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-rose-50 text-rose-700 shrink-0">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            <path d="m9 12 2 2 4-4" />
-          </svg>
-        </span>
-      </div>
-      <div class="mt-1 flex items-baseline gap-1.5">
-        <span class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-rose-700">{{ active_overrides_count }}</span>
-        <span class="text-xs font-semibold text-slate-500">holds</span>
-        <span class="ml-auto text-[11px] font-mono tabular-nums text-slate-500">{{ high_anomalies_count }} fuel flags</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Band 3A: AI Risk Review Tab (Zero-Scroll 12-Col Grid) -->
-  <div x-show="activeTab === 'review'"
-       {% if active_tab != 'review' %}style="display: none;"{% endif %}
-       data-scroll-section
-       data-scroll-label="AI Risk Review"
-       class="grid grid-cols-1 lg:grid-cols-12 gap-3">
-
-    <!-- Left 5 Cols: Simple-Menu Scenarios + Shift Handover Brief -->
-    <div class="lg:col-span-5 flex flex-col gap-2.5">
-      <!-- 2x2 Tappable KJO Scenario Preset Cards + 1-Line Directive -->
-      <section class="surface-card p-3 space-y-2">
-        <div class="flex items-center justify-between gap-2">
-          <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-600">Shift Scenario Presets</h2>
-          <button type="button"
-                  @click="usePresetAndReview()"
-                  class="text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 underline decoration-indigo-400/50">
-            Skip &amp; Use Preset
-          </button>
-        </div>
-
-        <div class="grid grid-cols-2 gap-1.5" role="group" aria-label="KJO shift scenarios">
-          {% for sc in scenarios %}
-          <button type="button"
-                  @click="selectScenario('{{ sc.key|escapejs }}')"
-                  :class="scenarioKey === '{{ sc.key|escapejs }}' ? 'border-indigo-500 bg-indigo-50/85 ring-1 ring-indigo-500/25 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'"
-                  class="rounded-xl border p-2 text-left transition-all space-y-0.5">
-            <div class="flex items-center justify-between gap-1">
-              <span class="text-[11px] font-bold text-slate-900 leading-tight truncate">{{ sc.title }}</span>
-              <span x-show="scenarioKey === '{{ sc.key|escapejs }}'" class="h-1.5 w-1.5 rounded-full bg-indigo-600 shrink-0"></span>
-            </div>
-            <p class="text-[10px] text-slate-500 leading-tight truncate">{{ sc.subtitle }}</p>
-          </button>
-          {% endfor %}
-        </div>
-
-        <div class="flex items-center gap-1.5 pt-0.5">
-          <label for="copilot-directive-input" class="sr-only">Optional supervisor directive</label>
-          <input id="copilot-directive-input"
-                 type="text"
-                 x-model="directive"
-                 @keydown.enter.prevent="submitReview()"
-                 placeholder="Optional supervisor directive (defaults applied)…"
-                 class="input input-bordered input-xs bg-white flex-1 text-xs" />
-          <button type="button"
-                  @click="submitReview()"
-                  class="btn btn-xs bg-indigo-600 hover:bg-indigo-700 text-white border-0 font-semibold shrink-0">
-            Run Review
-          </button>
-        </div>
-      </section>
-
-      <!-- Executive Summary & Shift Handover Card (.ai-copilot-surface) -->
-      <section class="ai-copilot-surface p-3.5 flex flex-col flex-1 justify-between gap-2.5">
-        <div class="space-y-2 min-h-0">
-          <div class="flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2 min-w-0">
-              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-600 text-white shrink-0">
-                Gemini 4 Co-Pilot
-              </span>
-              <h2 class="text-xs font-bold text-indigo-950 truncate">Executive Handover Brief</h2>
-            </div>
-            <span class="font-mono text-[10px] text-indigo-800/80 truncate">{{ selected_scenario.title }}</span>
-          </div>
-
-          <div class="max-h-[175px] xl:max-h-[195px] overflow-y-auto pr-1 space-y-2">
-            <p class="text-xs text-slate-800 leading-relaxed">{{ briefing.executive_summary }}</p>
-
-            <div class="rounded-lg bg-emerald-50/85 border border-emerald-200/80 px-2.5 py-1.5 text-[11px] text-emerald-950">
-              <span class="font-semibold uppercase tracking-wider text-[10px] text-emerald-800 mr-1">Impact:</span>
-              <span class="font-mono tabular-nums">{{ briefing.estimated_impact_note }}</span>
-            </div>
-
-            <div class="rounded-lg bg-white/85 border border-indigo-200/70 px-2.5 py-2 space-y-0.5">
-              <div class="text-[10px] font-semibold uppercase tracking-wider text-indigo-800">Shift Handover Note</div>
-              <p class="text-[11px] text-slate-700 leading-relaxed">{{ briefing.shift_handover_note }}</p>
-            </div>
-          </div>
-
-          <!-- Hidden Plain-Text Copy Source -->
-          <div id="copilot-brief-copy-source" class="sr-only">
-            KGOC Marine Fleet Shift Handover — {{ selected_scenario.title }}
-            Summary: {{ briefing.executive_summary }}
-            Impact: {{ briefing.estimated_impact_note }}
-            Handover: {{ briefing.shift_handover_note }}
-          </div>
-        </div>
-
-        <!-- Copy Brief + Save Handover Action Bar -->
-        <div class="pt-2 border-t border-indigo-200/60 flex flex-wrap items-center justify-between gap-2">
-          <button type="button"
-                  @click="copyBrief()"
-                  class="btn btn-xs bg-white border border-indigo-200 text-indigo-900 hover:bg-indigo-50 gap-1 font-medium">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+      <div class="mt-2 flex items-center gap-2">
+        <label for="copilot-directive-input" class="sr-only">Ask a custom shift question or supervisor directive</label>
+        <input id="copilot-directive-input"
+               type="text"
+               name="directive"
+               x-model="directive"
+               @keydown.enter.prevent="submitReview()"
+               placeholder="Ask a custom shift question or pick a Quick Brief above…"
+               class="input input-bordered input-sm bg-white flex-1 text-xs" />
+        <button id="run-copilot-review-btn"
+                type="submit"
+                class="btn btn-sm bg-indigo-600 hover:bg-indigo-700 text-white border-0 gap-1.5 font-semibold shrink-0">
+          <span class="htmx-hide-on-request inline-flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3z" />
             </svg>
-            <span x-show="!copiedBrief">Copy Brief</span>
-            <span x-show="copiedBrief" x-cloak class="text-emerald-700 font-semibold">Copied!</span>
-          </button>
-
-          <form method="post"
-                action="{% url 'core:copilot:save_briefing' %}"
-                hx-post="{% url 'core:copilot:save_briefing' %}"
-                hx-target="#copilot-workspace"
-                hx-swap="outerHTML"
-                hx-indicator="#save-brief-spinner"
-                hx-disabled-elt="#save-brief-btn"
-                class="inline">
-            {% csrf_token %}
-            <input type="hidden" name="briefing_json" value="{{ briefing_json }}" />
-            <input type="hidden" name="ai_fallback_used" value="{{ ai_fallback_used|yesno:'1,0' }}" />
-            <input type="hidden" name="scenario_key" :value="scenarioKey" />
-            <input type="hidden" name="directive" :value="directive" />
-            <input type="hidden" name="strict_weather" :value="strictWeather ? '1' : '0'" />
-            <input type="hidden" name="allow_milk_run" :value="allowMilkRun ? '1' : '0'" />
-            <button id="save-brief-btn"
-                    type="submit"
-                    class="btn btn-xs bg-indigo-600 hover:bg-indigo-700 text-white border-0 gap-1.5 font-semibold">
-              <span class="htmx-hide-on-request inline-flex items-center gap-1">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                  <polyline points="17 21 17 13 7 13 7 21" />
-                  <polyline points="7 3 7 8 15 8" />
-                </svg>
-                <span>Save Handover</span>
-              </span>
-              <span id="save-brief-spinner" class="htmx-indicator items-center gap-1">
-                <span class="loading loading-spinner loading-xs"></span>
-                <span>Saving…</span>
-              </span>
-            </button>
-          </form>
-        </div>
-      </section>
-    </div>
-
-    <!-- Right 7 Cols: Unified 2-Tab Actionable AI Panel (Merge Verdicts | Safety Flags & Holds) -->
-    <section class="lg:col-span-7 surface-card overflow-hidden flex flex-col">
-      <!-- Unified Panel 2-Tab Header -->
-      <div class="px-3.5 py-2 border-b border-slate-100 bg-slate-50/70 flex flex-wrap items-center justify-between gap-2">
-        <div class="inline-flex items-center rounded-lg bg-slate-200/70 p-0.5"
-             role="tablist"
-             aria-label="AI review findings">
-          <button type="button"
-                  role="tab"
-                  :aria-selected="(rightTab === 'verdicts').toString()"
-                  @click="rightTab = 'verdicts'"
-                  :class="rightTab === 'verdicts' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
-                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all">
-            <span>Merge Verdicts</span>
-            <span class="font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 leading-none">
-              {{ merge_assessments|length }}
-            </span>
-          </button>
-
-          <button type="button"
-                  role="tab"
-                  :aria-selected="(rightTab === 'safety').toString()"
-                  @click="rightTab = 'safety'"
-                  :class="rightTab === 'safety' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
-                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all">
-            <span>Safety Flags &amp; Holds</span>
-            <span class="font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded-full leading-none {% if safety_flags_and_holds_count > 0 %}bg-rose-100 text-rose-800 border border-rose-200{% else %}bg-slate-100 text-slate-600{% endif %}">
-              {{ safety_flags_and_holds_count }}
-            </span>
-          </button>
-        </div>
-
-        <span class="font-mono tabular-nums text-[11px] text-slate-500">
-          {{ pending_count }} pending · {{ active_overrides_count }} HSE lock{{ active_overrides_count|pluralize }}
-        </span>
+            <span>Generate Brief</span>
+          </span>
+          <span id="copilot-spinner" class="htmx-indicator items-center gap-1.5">
+            <span class="loading loading-spinner loading-xs"></span>
+            <span>Analyzing…</span>
+          </span>
+        </button>
       </div>
+    </form>
+  </section>
 
-      <!-- Sub-Tab 1: Per-Merge AI Verdicts + Approve AI-Cleared Merges Footer -->
-      <div x-show="rightTab === 'verdicts'"
-           {% if active_subtab != 'verdicts' %}style="display: none;"{% endif %}
-           class="flex flex-col flex-1 min-h-0">
-        <div class="p-3 bg-slate-50/40 max-h-[340px] xl:max-h-[375px] overflow-y-auto space-y-2 flex-1">
-          {% for item in merge_assessments %}
-          <div class="rounded-xl border bg-white p-2.5 space-y-1.5 border-l-4
-            {% if item.verdict == 'approve' %}border-slate-200 border-l-emerald-600
-            {% elif item.verdict == 'review' %}border-amber-200/90 border-l-amber-500
-            {% else %}border-rose-200/90 border-l-rose-600{% endif %}">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <div class="flex flex-wrap items-center gap-1.5 min-w-0">
-                <span class="text-xs font-semibold text-slate-900 truncate">{{ item.merge.route_label }}</span>
-                <span class="font-mono tabular-nums text-[11px] text-slate-500">
-                  {{ item.merge.recommended_departure_dt|date:"H:i" }}
-                </span>
-                {% if item.merge.mode == 'milk_run' %}
-                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-teal-50 text-teal-800 border border-teal-200">Milk-Run</span>
-                {% endif %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono tabular-nums">
-                  +{{ item.merge.kwd_saved|floatformat:0 }} KWD · {{ item.merge.fuel_saved_l|floatformat:0 }} L
-                </span>
-              </div>
+  <!-- Band 3A: Low-Clutter Executive Brief (7 Cols) + Key Signals & Actions Rail (5 Cols) -->
+  <div x-show="activeTab === 'review'"
+       {% if active_tab != 'review' %}style="display: none;"{% endif %}
+       data-scroll-section
+       data-scroll-label="Executive Brief"
+       class="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
-              <div class="flex items-center gap-1.5 shrink-0">
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border
-                  {% if item.verdict == 'approve' %}bg-emerald-50 text-emerald-800 border-emerald-200
-                  {% elif item.verdict == 'review' %}bg-amber-50 text-amber-900 border-amber-200
-                  {% else %}bg-rose-50 text-rose-800 border-rose-200{% endif %}">
-                  {% if item.verdict == 'approve' %}Approve{% elif item.verdict == 'review' %}Review{% else %}Hold{% endif %}
-                </span>
-                <span class="font-mono uppercase text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
-                  {{ item.risk_level }} risk
-                </span>
-              </div>
-            </div>
-
-            <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono tabular-nums text-slate-700 bg-slate-50/80 rounded-lg px-2.5 py-1 border border-slate-200/70">
-              <span>
-                {{ item.merge.primary_trip.trip_id }} ({{ item.merge.primary_trip.vessel.vessel_id }}) + {{ item.merge.absorbed_trip.trip_id }} ({{ item.merge.absorbed_trip.vessel.vessel_id }})
-              </span>
-              <span class="font-semibold text-slate-900">
-                → {{ item.merge.assigned_vessel.vessel_id }} · {{ item.merge.combined_util_pct|floatformat:0 }}% load ({{ item.merge.combined_pax }}/{{ item.merge.assigned_vessel.passenger_capacity }}p)
-              </span>
-            </div>
-
-            <p class="text-[11px] text-slate-600 leading-snug">{{ item.rationale }}</p>
-          </div>
-          {% empty %}
-          <div class="py-10 px-4 text-center space-y-2.5">
-            <div class="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
-            </div>
-            <div class="text-xs font-semibold text-slate-900">No Pending Merge Proposals Under Current Policy</div>
-            <p class="text-[11px] text-slate-500 max-w-sm mx-auto">
-              All compatible shift requests are already consolidated or protected by active HSE holds. Switch to Safety Flags &amp; Holds or adjust scenario presets.
-            </p>
-            <div class="flex items-center justify-center gap-2 pt-1">
-              <button type="button" @click="rightTab = 'safety'" class="btn btn-outline btn-xs border-slate-300 text-slate-700">
-                Inspect Safety Flags &amp; Holds
-              </button>
-              <button type="button" @click="activeTab = 'briefings'" class="btn btn-xs bg-indigo-600 hover:bg-indigo-700 text-white border-0">
-                View Saved Briefings
-              </button>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-
-        <!-- Approve AI-Cleared Merges Action Footer -->
-        <div class="px-4 py-2.5 border-t border-slate-200 bg-slate-50/90 flex flex-wrap items-center justify-between gap-2">
-          <div class="text-xs text-slate-600">
-            <span class="font-semibold text-slate-900 font-mono tabular-nums">{{ approve_count }}</span>
-            <span>AI-cleared merge{{ approve_count|pluralize }}</span>
-            {% if approve_count > 0 %}
-            <span class="font-mono tabular-nums text-emerald-700 font-semibold ml-1">
-              · +{{ cleared_summary.kwd_saved|floatformat:"0g" }} KWD · {{ cleared_summary.fuel_liters_saved|floatformat:"0g" }} L
+    <!-- Left 7 Cols: Hero Executive Brief Card -->
+    <section class="lg:col-span-7 ai-copilot-surface p-4 sm:p-5 flex flex-col justify-between gap-3">
+      <div class="space-y-2.5 min-h-0">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-600 text-white shrink-0">
+              Gemini 4 Co-Pilot
             </span>
-            {% endif %}
+            <h2 class="text-sm font-bold text-indigo-950 truncate">Executive Brief</h2>
           </div>
 
-          <form method="post"
-                action="{% url 'core:copilot:approve_recommended' %}"
-                hx-post="{% url 'core:copilot:approve_recommended' %}"
-                hx-target="#copilot-workspace"
-                hx-swap="outerHTML"
-                hx-indicator="#approve-rec-spinner"
-                hx-disabled-elt="#approve-rec-btn"
-                class="inline">
-            {% csrf_token %}
-            <input type="hidden" name="briefing_json" value="{{ briefing_json }}" />
-            <input type="hidden" name="ai_fallback_used" value="{{ ai_fallback_used|yesno:'1,0' }}" />
-            <input type="hidden" name="scenario_key" :value="scenarioKey" />
-            <input type="hidden" name="directive" :value="directive" />
-            <input type="hidden" name="strict_weather" :value="strictWeather ? '1' : '0'" />
-            <input type="hidden" name="allow_milk_run" :value="allowMilkRun ? '1' : '0'" />
-            {% for mid in approved_merge_ids %}
-            <input type="hidden" name="merge_ids" value="{{ mid }}" />
-            {% endfor %}
-            <button id="approve-rec-btn"
-                    type="submit"
-                    {% if approve_count == 0 %}disabled{% endif %}
-                    class="btn btn-primary btn-sm gap-1.5 font-semibold">
-              <span class="htmx-hide-on-request inline-flex items-center gap-1.5">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-                <span>Approve AI-Cleared Merges ({{ approve_count }})</span>
-              </span>
-              <span id="approve-rec-spinner" class="htmx-indicator items-center gap-1.5">
-                <span class="loading loading-spinner loading-xs"></span>
-                <span>Consolidating…</span>
-              </span>
-            </button>
-          </form>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-white/80 border border-indigo-200 text-indigo-900">
+              {{ selected_scenario.title }}
+            </span>
+            <span class="font-mono tabular-nums text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+              {% if approve_count > 0 %}+{{ cleared_summary.kwd_saved|floatformat:"0g" }} KWD · mock{% elif summary.kwd_saved > 0 %}+{{ summary.kwd_saved|floatformat:"0g" }} KWD · mock{% else %}{{ active_overrides_count }} HSE Lock{% endif %}
+            </span>
+          </div>
         </div>
-      </div>
 
-      <!-- Sub-Tab 2: Engineering Safety Flags & 1-Click Recommended HSE Holds -->
-      <div x-show="rightTab === 'safety'"
-           x-cloak
-           {% if active_subtab != 'safety' %}style="display: none;"{% endif %}
-           class="flex flex-col flex-1 min-h-0">
-        <div class="p-3 bg-slate-50/40 max-h-[395px] xl:max-h-[430px] overflow-y-auto space-y-3 flex-1">
-          <!-- Recommended 1-Click HSE Holds -->
-          <div class="space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <h3 class="text-[11px] font-semibold uppercase tracking-wider text-slate-600">Recommended HSE Holds</h3>
-              <a href="{% url 'safety:index' %}?tab=holds"
-                 class="text-[11px] font-semibold text-teal-700 hover:text-teal-900 underline decoration-teal-500/40">
-                Manage All Holds →
-              </a>
-            </div>
+        <div class="max-h-[300px] xl:max-h-[380px] overflow-y-auto pr-1 space-y-2.5">
+          <p class="text-[13px] sm:text-sm text-slate-800 leading-relaxed">{{ briefing.executive_summary }}</p>
 
-            {% for hold in recommended_holds %}
-            <div class="rounded-xl border border-rose-200 bg-white border-l-4 border-l-rose-600 p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
-              <div class="space-y-1 min-w-0 flex-1">
-                <div class="flex flex-wrap items-center gap-1.5">
-                  <span class="text-xs font-bold text-slate-900">{{ hold.title }}</span>
-                  <span class="font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200 font-semibold">
-                    {{ hold.metric_badge }}
-                  </span>
-                  <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
-                    {{ hold.rule_label }}
-                  </span>
-                </div>
-                <p class="text-[11px] text-slate-600 leading-snug">{{ hold.reason }}</p>
-              </div>
-
-              <div class="shrink-0">
-                {% if hold.is_already_active %}
-                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-emerald-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    <path d="m9 12 2 2 4-4" />
-                  </svg>
-                  Hold Active
-                </span>
-                {% else %}
-                <form method="post"
-                      action="{% url 'core:copilot:apply_hold' %}"
-                      hx-post="{% url 'core:copilot:apply_hold' %}"
-                      hx-target="#copilot-workspace"
-                      hx-swap="outerHTML"
-                      hx-indicator="#apply-hold-spin-{{ hold.key }}"
-                      hx-disabled-elt="button[type='submit']"
-                      class="inline">
-                  {% csrf_token %}
-                  <input type="hidden" name="rule_type" value="{{ hold.rule_type }}" />
-                  <input type="hidden" name="vessel_id" value="{{ hold.vessel_id }}" />
-                  <input type="hidden" name="destination" value="{{ hold.destination }}" />
-                  <input type="hidden" name="source_trip_id" value="{{ hold.source_trip_id }}" />
-                  <input type="hidden" name="severity" value="{{ hold.severity }}" />
-                  <input type="hidden" name="reason" value="{{ hold.reason }}" />
-                  <input type="hidden" name="scenario_key" :value="scenarioKey" />
-                  <input type="hidden" name="directive" :value="directive" />
-                  <input type="hidden" name="strict_weather" :value="strictWeather ? '1' : '0'" />
-                  <input type="hidden" name="allow_milk_run" :value="allowMilkRun ? '1' : '0'" />
-                  <button type="submit"
-                          class="btn btn-xs bg-rose-600 hover:bg-rose-700 text-white border-0 gap-1 font-semibold">
-                    <span class="htmx-hide-on-request inline-flex items-center gap-1">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                        <path d="M12 8v4" /><path d="M12 16h.01" />
-                      </svg>
-                      <span>Apply Hold</span>
-                    </span>
-                    <span id="apply-hold-spin-{{ hold.key }}" class="htmx-indicator items-center gap-1">
-                      <span class="loading loading-spinner loading-xs"></span>
-                      <span>Saving…</span>
-                    </span>
-                  </button>
-                </form>
-                {% endif %}
-              </div>
-            </div>
-            {% empty %}
-            <p class="text-xs text-slate-500 bg-white rounded-xl border border-slate-200 p-3">
-              No additional HSE hold actions recommended for the current fleet queue.
-            </p>
-            {% endfor %}
+          <div class="rounded-xl bg-emerald-50/85 border border-emerald-200/80 px-3 py-2 text-xs text-emerald-950">
+            <span class="font-semibold uppercase tracking-wider text-[10px] text-emerald-800 mr-1.5">Quantified Impact:</span>
+            <span class="font-mono tabular-nums">{{ briefing.estimated_impact_note }}</span>
           </div>
 
-          <!-- Engineering & HSE Safety Flags -->
-          <div class="space-y-1.5">
-            <h3 class="text-[11px] font-semibold uppercase tracking-wider text-slate-600">
-              Engineering &amp; HSE Safety Flags ({{ briefing.safety_flags|length }})
-            </h3>
-            {% for flag in briefing.safety_flags %}
-            <div class="rounded-lg border border-amber-200/80 bg-amber-50/60 px-3 py-2 text-xs text-slate-800 flex items-start gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-amber-700 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-                <path d="M12 9v4" /><path d="M12 17h.01" />
-              </svg>
-              <span class="leading-snug">{{ flag }}</span>
-            </div>
-            {% empty %}
-            <p class="text-xs text-slate-500">No active engineering or sea-state safety flags.</p>
-            {% endfor %}
+          <div class="rounded-xl bg-white/90 border border-indigo-200/70 px-3.5 py-2.5 space-y-1">
+            <div class="text-[10px] font-semibold uppercase tracking-wider text-indigo-800">Next-Shift Handover</div>
+            <p class="text-xs text-slate-700 leading-relaxed">{{ briefing.shift_handover_note }}</p>
           </div>
 
-          {% if active_overrides %}
-          <div class="space-y-1.5">
-            <h3 class="text-[11px] font-semibold uppercase tracking-wider text-slate-600">
-              Enforced Active HSE Locks ({{ active_overrides_count }})
-            </h3>
-            <div class="flex flex-wrap gap-1.5">
-              {% for ov in active_overrides %}
-              <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] bg-white border border-rose-200 text-rose-900">
-                <span class="font-mono font-bold">
-                  {% if ov.vessel %}{{ ov.vessel.vessel_id }}{% elif ov.destination %}{{ ov.destination }}{% else %}Fleet{% endif %}
-                </span>
-                <span class="text-slate-400">·</span>
-                <span>{{ ov.get_rule_type_display }}</span>
+          {% if merge_assessments %}
+          <div class="rounded-xl bg-white/85 border border-slate-200/80 px-3 py-2 space-y-1.5">
+            <div class="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+              <span class="font-semibold uppercase tracking-wider text-[10px] text-slate-600">Consolidation Highlights</span>
+              <span class="font-mono tabular-nums text-slate-600">
+                <span class="text-emerald-700 font-semibold">{{ approve_count }} Approve</span> ·
+                <span class="text-amber-700 font-semibold">{{ review_count }} Review</span> ·
+                <span class="text-rose-700 font-semibold">{{ hold_count }} Hold</span>
               </span>
-              {% endfor %}
             </div>
+            {% for item in merge_assessments|slice:":2" %}
+            <div class="flex items-start justify-between gap-2 text-[11px] pt-1 border-t border-slate-100">
+              <div class="min-w-0">
+                <span class="font-mono font-semibold text-slate-900">{{ item.merge.primary_trip.trip_id }} + {{ item.merge.absorbed_trip.trip_id }}</span>
+                <span class="text-slate-500"> · {{ item.merge.route_label }}</span>
+                <p class="text-slate-600 truncate">{{ item.rationale }}</p>
+              </div>
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase border shrink-0
+                {% if item.verdict == 'approve' %}bg-emerald-50 text-emerald-800 border-emerald-200
+                {% elif item.verdict == 'review' %}bg-amber-50 text-amber-900 border-amber-200
+                {% else %}bg-rose-50 text-rose-800 border-rose-200{% endif %}">
+                {% if item.verdict == 'approve' %}Approve{% elif item.verdict == 'review' %}Review{% else %}Hold{% endif %}
+              </span>
+            </div>
+            {% endfor %}
           </div>
           {% endif %}
         </div>
+
+        <!-- Hidden Plain-Text Copy Source -->
+        <div id="copilot-brief-copy-source" class="sr-only">
+          KGOC Marine Fleet Shift Handover — {{ selected_scenario.title }}
+          Summary: {{ briefing.executive_summary }}
+          Impact: {{ briefing.estimated_impact_note }}
+          Handover: {{ briefing.shift_handover_note }}
+        </div>
       </div>
+
+      <!-- Copy Brief + Save Brief Footer -->
+      <div class="pt-2.5 border-t border-indigo-200/60 flex flex-wrap items-center justify-between gap-2">
+        <button type="button"
+                @click="copyBrief()"
+                class="btn btn-xs bg-white border border-indigo-200 text-indigo-900 hover:bg-indigo-50 gap-1 font-medium">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+          </svg>
+          <span x-show="!copiedBrief">Copy Brief</span>
+          <span x-show="copiedBrief" x-cloak class="text-emerald-700 font-semibold">Copied!</span>
+        </button>
+
+        <form method="post"
+              action="{% url 'core:copilot:save_briefing' %}"
+              hx-post="{% url 'core:copilot:save_briefing' %}"
+              hx-target="#copilot-workspace"
+              hx-swap="outerHTML"
+              hx-indicator="#save-brief-spinner"
+              hx-disabled-elt="#save-brief-btn"
+              class="inline">
+          {% csrf_token %}
+          <input type="hidden" name="briefing_json" value="{{ briefing_json }}" />
+          <input type="hidden" name="ai_fallback_used" value="{{ ai_fallback_used|yesno:'1,0' }}" />
+          <input type="hidden" name="scenario_key" :value="scenarioKey" />
+          <input type="hidden" name="directive" :value="directive" />
+          <input type="hidden" name="strict_weather" :value="strictWeather ? '1' : '0'" />
+          <input type="hidden" name="allow_milk_run" :value="allowMilkRun ? '1' : '0'" />
+          <button id="save-brief-btn"
+                  type="submit"
+                  class="btn btn-xs bg-indigo-600 hover:bg-indigo-700 text-white border-0 gap-1.5 font-semibold">
+            <span class="htmx-hide-on-request inline-flex items-center gap-1">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                <polyline points="17 21 17 13 7 13 7 21" />
+                <polyline points="7 3 7 8 15 8" />
+              </svg>
+              <span>Save Brief</span>
+            </span>
+            <span id="save-brief-spinner" class="htmx-indicator items-center gap-1">
+              <span class="loading loading-spinner loading-xs"></span>
+              <span>Saving…</span>
+            </span>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Right 5 Cols: Flat Key Signals & Actions Rail -->
+    <section class="lg:col-span-5 surface-card p-4 flex flex-col justify-between gap-3">
+      <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700">Key Signals &amp; Actions</h2>
+        <span class="font-mono tabular-nums text-[11px] text-slate-500">
+          {{ active_overrides_count }} active lock{{ active_overrides_count|pluralize }} · {{ high_anomalies_count }} fuel flags
+        </span>
+      </div>
+
+      <div class="max-h-[300px] xl:max-h-[380px] overflow-y-auto pr-1 space-y-3 flex-1">
+        <!-- Top 3 AI Safety & Engineering Flags -->
+        <div class="space-y-1.5">
+          <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Top AI Safety &amp; Engineering Flags</div>
+          {% for flag in briefing.safety_flags|slice:":3" %}
+          <div class="rounded-lg border border-amber-200/80 bg-amber-50/60 px-2.5 py-2 text-[11px] text-slate-800 flex items-start gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-amber-700 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+              <path d="M12 9v4" /><path d="M12 17h.01" />
+            </svg>
+            <span class="leading-snug">{{ flag }}</span>
+          </div>
+          {% empty %}
+          <p class="text-xs text-slate-500">No urgent engineering or sea-state flags for this shift.</p>
+          {% endfor %}
+        </div>
+
+        <!-- Up to 2 Compact 1-Click Recommended HSE Holds -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Recommended HSE Holds</span>
+            <a href="{% url 'safety:index' %}?tab=holds"
+               class="text-[11px] font-semibold text-teal-700 hover:text-teal-900 underline decoration-teal-500/40">
+              Manage in Safety →
+            </a>
+          </div>
+
+          {% for hold in recommended_holds|slice:":2" %}
+          <div class="rounded-xl border border-rose-200 bg-white border-l-4 border-l-rose-600 p-2.5 space-y-1.5">
+            <div class="flex flex-wrap items-center justify-between gap-1.5">
+              <span class="text-xs font-bold text-slate-900">{{ hold.title }}</span>
+              <span class="font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200 font-semibold">
+                {{ hold.metric_badge }}
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-600 leading-snug line-clamp-2">{{ hold.reason }}</p>
+            <div class="flex items-center justify-between gap-2 pt-0.5">
+              <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">{{ hold.rule_label }}</span>
+              {% if hold.is_already_active %}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                Hold Active
+              </span>
+              {% else %}
+              <form method="post"
+                    action="{% url 'core:copilot:apply_hold' %}"
+                    hx-post="{% url 'core:copilot:apply_hold' %}"
+                    hx-target="#copilot-workspace"
+                    hx-swap="outerHTML"
+                    hx-indicator="#apply-hold-spin-{{ hold.key }}"
+                    hx-disabled-elt="button[type='submit']"
+                    class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="rule_type" value="{{ hold.rule_type }}" />
+                <input type="hidden" name="vessel_id" value="{{ hold.vessel_id }}" />
+                <input type="hidden" name="destination" value="{{ hold.destination }}" />
+                <input type="hidden" name="source_trip_id" value="{{ hold.source_trip_id }}" />
+                <input type="hidden" name="severity" value="{{ hold.severity }}" />
+                <input type="hidden" name="reason" value="{{ hold.reason }}" />
+                <input type="hidden" name="scenario_key" :value="scenarioKey" />
+                <input type="hidden" name="directive" :value="directive" />
+                <input type="hidden" name="strict_weather" :value="strictWeather ? '1' : '0'" />
+                <input type="hidden" name="allow_milk_run" :value="allowMilkRun ? '1' : '0'" />
+                <button type="submit"
+                        class="btn btn-xs bg-rose-600 hover:bg-rose-700 text-white border-0 gap-1 font-semibold">
+                  <span class="htmx-hide-on-request inline-flex items-center gap-1">
+                    <span>Apply Hold</span>
+                  </span>
+                  <span id="apply-hold-spin-{{ hold.key }}" class="htmx-indicator items-center gap-1">
+                    <span class="loading loading-spinner loading-xs"></span>
+                    <span>Saving…</span>
+                  </span>
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+          {% empty %}
+          <p class="text-xs text-slate-500 bg-slate-50 rounded-xl border border-slate-200 p-2.5">
+            No additional HSE holds recommended for the current shift queue.
+          </p>
+          {% endfor %}
+        </div>
+      </div>
+
+      {% if active_overrides %}
+      <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+        <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mr-0.5">Enforced Locks:</span>
+        {% for ov in active_overrides %}
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] bg-slate-50 border border-rose-200 text-rose-900">
+          <span class="font-mono font-bold">
+            {% if ov.vessel %}{{ ov.vessel.vessel_id }}{% elif ov.destination %}{{ ov.destination }}{% else %}Fleet{% endif %}
+          </span>
+          <span class="text-slate-400">·</span>
+          <span>{{ ov.get_rule_type_display }}</span>
+        </span>
+        {% endfor %}
+      </div>
+      {% endif %}
     </section>
   </div>
 
@@ -692,7 +426,7 @@
       <div class="px-4 py-2.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 class="text-sm font-semibold text-slate-900">Persisted Shift Handover Briefings</h2>
-          <p class="text-[11px] text-slate-500">Saved AI risk reviews and consolidated shift plans with audit trail</p>
+          <p class="text-[11px] text-slate-500">Saved executive shift briefings with audit trail</p>
         </div>
         <div class="flex items-center gap-2">
           <span class="font-mono tabular-nums text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200 font-semibold">
@@ -701,12 +435,12 @@
           <button type="button"
                   @click="activeTab = 'review'"
                   class="btn btn-outline btn-xs border-slate-300 text-slate-700 hover:bg-slate-100">
-            Back to Risk Review
+            Back to Executive Brief
           </button>
         </div>
       </div>
 
-      <div class="max-h-[500px] overflow-y-auto overflow-x-auto">
+      <div class="max-h-[480px] overflow-y-auto overflow-x-auto">
         <table class="table table-xs w-full">
           <thead class="sticky top-0 z-10 bg-slate-50">
             <tr class="text-slate-500 text-[10px] uppercase tracking-wider border-b border-slate-200">
@@ -806,10 +540,10 @@
             <tr>
               <td colspan="6" class="py-10 text-center space-y-2">
                 <p class="text-sm font-medium text-slate-700">No shift handover briefings saved yet.</p>
-                <p class="text-xs text-slate-500">Run an AI Risk Review and click Save Handover or Approve AI-Cleared Merges to build a shift audit trail.</p>
+                <p class="text-xs text-slate-500">Generate an Executive Brief and click Save Brief to build a shift audit trail.</p>
                 <div class="pt-1">
                   <button type="button" @click="activeTab = 'review'" class="btn btn-xs bg-indigo-600 hover:bg-indigo-700 text-white border-0">
-                    Open AI Risk Review
+                    Open Executive Brief
                   </button>
                 </div>
               </td>

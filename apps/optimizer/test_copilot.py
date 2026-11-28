@@ -357,6 +357,19 @@ class CopilotViewsIntegrationTests(TestCase):
         self.assertEqual(ping_resp.status_code, 200)
         self.assertContains(ping_resp, "HTMX POST + CSRF verified")
 
+    @override_settings(GEMINI_API_KEY="test-key")
+    def test_index_shows_ready_badge_when_configured_and_fallback_when_unconfigured(self):
+        configured_resp = self.client.get(reverse("core:copilot:index"))
+        self.assertEqual(configured_resp.status_code, 200)
+        self.assertContains(configured_resp, "Gemini 4 Ready")
+        self.assertNotContains(configured_resp, "Deterministic Fallback")
+
+        with override_settings(GEMINI_API_KEY=""):
+            unconfigured_resp = self.client.get(reverse("core:copilot:index"))
+        self.assertEqual(unconfigured_resp.status_code, 200)
+        self.assertContains(unconfigured_resp, "Deterministic Fallback")
+        self.assertNotContains(unconfigured_resp, "Gemini 4 Ready")
+
     @override_settings(GEMINI_API_KEY="")
     def test_review_endpoint_falls_back_cleanly_without_api_key(self):
         resp = self.client.post(
